@@ -1,0 +1,59 @@
+version: '3.9'
+
+# EADPA - Local Development Environment
+# Run with: docker-compose up -d
+
+services:
+  # Frontend - Next.js
+  frontend:
+    build:
+      context: .
+      dockerfile: packages/frontend/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:4000/api
+      - NEXT_PUBLIC_WS_URL=ws://localhost:4000/ws
+    volumes:
+      - ./packages/frontend/src:/app/src
+    depends_on:
+      - backend
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+      - FRONTEND_URL=http://localhost:3000
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID:-anthropic.claude-sonnet-4-20250514}
+      - BEDROCK_REGION=${BEDROCK_REGION:-us-east-1}
+      - DYNAMODB_ENDPOINT=http://dynamodb:8000
+      - S3_ENDPOINT=http://localstack:4566
+    volumes:
+      - ./packages/backend/src:/app/src
+    depends_on:
+      - dynamodb
+
+  # DynamoDB Local (state store)
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    ports:
+      - "8000:8000"
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb"]
+
+  # LocalStack (S3, Secrets Manager simulation)
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,secretsmanager,stepfunctions
+      - DEFAULT_REGION=us-east-1
+    volumes:
+      - ./infrastructure/localstack-init:/etc/localstack/init/ready.d

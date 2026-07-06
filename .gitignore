@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build outputs
+dist/
+.next/
+out/
+build/
+
+# environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# turbo
+.turbo/
+
+# test coverage
+coverage/
+
+# CDK
+cdk.out/
+
+# temporary
+tmp/
+temp/
