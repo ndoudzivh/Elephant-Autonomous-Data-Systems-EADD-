@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1584" height="396" viewBox="0 0 1584 396">
+  <defs>
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a1628"/>
+      <stop offset="50%" style="stop-color:#0d1f3c"/>
+      <stop offset="100%" style="stop-color:#0a1628"/>
+    </linearGradient>
+    <linearGradient id="blue-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e90ff"/>
+      <stop offset="50%" style="stop-color:#00bcd4"/>
+      <stop offset="100%" style="stop-color:#1e90ff"/>
+    </linearGradient>
+    <linearGradient id="text-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#60a5fa"/>
+      <stop offset="50%" style="stop-color:#06b6d4"/>
+      <stop offset="100%" style="stop-color:#10b981"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glow-strong">
+      <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1584" height="396" fill="url(#bg-gradient)"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.03" stroke="#60a5fa" stroke-width="0.5">
+    <line x1="0" y1="66" x2="1584" y2="66"/>
+    <line x1="0" y1="132" x2="1584" y2="132"/>
+    <line x1="0" y1="198" x2="1584" y2="198"/>
+    <line x1="0" y1="264" x2="1584" y2="264"/>
+    <line x1="0" y1="330" x2="1584" y2="330"/>
+    <line x1="264" y1="0" x2="264" y2="396"/>
+    <line x1="528" y1="0" x2="528" y2="396"/>
+    <line x1="792" y1="0" x2="792" y2="396"/>
+    <line x1="1056" y1="0" x2="1056" y2="396"/>
+    <line x1="1320" y1="0" x2="1320" y2="396"/>
+  </g>
+
+  <!-- Circuit/data flow lines (decorative) -->
+  <g opacity="0.12" stroke="#1e90ff" stroke-width="1" fill="none">
+    <!-- Top circuit lines -->
+    <path d="M 0,80 H 120 L 140,100 H 200"/>
+    <circle cx="200" cy="100" r="3" fill="#1e90ff"/>
+    <path d="M 1584,60 H 1450 L 1430,80 H 1380"/>
+    <circle cx="1380" cy="80" r="3" fill="#1e90ff"/>
+    <!-- Bottom circuit lines -->
+    <path d="M 0,320 H 80 L 100,300 H 160"/>
+    <circle cx="160" cy="300" r="3" fill="#1e90ff"/>
+    <path d="M 1584,340 H 1500 L 1480,320 H 1420"/>
+    <circle cx="1420" cy="320" r="3" fill="#1e90ff"/>
+    <!-- Middle accent lines -->
+    <path d="M 1300,150 H 1350 L 1370,170 H 1420 L 1440,150 H 1584"/>
+    <path d="M 1320,250 H 1380 L 1400,230 H 1450"/>
+    <circle cx="1450" cy="230" r="3" fill="#06b6d4"/>
+  </g>
+
+  <!-- Data node dots (scattered) -->
+  <g fill="#1e90ff" opacity="0.2">
+    <circle cx="100" cy="150" r="2"/>
+    <circle cx="150" cy="200" r="1.5"/>
+    <circle cx="80" cy="250" r="2"/>
+    <circle cx="1500" cy="120" r="2"/>
+    <circle cx="1450" cy="280" r="1.5"/>
+    <circle cx="1520" cy="180" r="2"/>
+    <circle cx="1380" cy="310" r="1.5"/>
+  </g>
+
+  <!-- LEFT SIDE: Elephant Logo Area -->
+  <!-- Elephant silhouette (geometric/circuit style) -->
+  <g transform="translate(100, 80)">
+    <!-- Elephant head outline - geometric style with circuit nodes -->
+    <g stroke="url(#blue-gradient)" stroke-width="2" fill="none" filter="url(#glow)">
+      <!-- Head shape -->
+      <path d="M 80,40 C 60,20 30,25 25,50 C 20,70 25,90 30,110 L 35,140 L 40,160 C 42,170 45,175 50,175 L 55,175 C 58,175 60,170 58,160 L 55,140 C 55,130 60,125 70,120 C 85,115 95,105 100,90 C 105,75 100,55 80,40 Z"/>
+      <!-- Ear -->
+      <path d="M 25,50 C 10,45 5,60 8,75 C 10,85 15,90 25,88"/>
+      <!-- Trunk -->
+      <path d="M 35,140 C 30,155 28,170 32,185 C 35,195 40,198 45,195"/>
+      <!-- Tusk -->
+      <path d="M 55,130 C 60,140 65,145 70,142" stroke-width="1.5"/>
+      <!-- Eye -->
+      <circle cx="65" cy="60" r="4" fill="#06b6d4" stroke="none"/>
+      <circle cx="65" cy="60" r="6" stroke="#06b6d4" stroke-width="1"/>
+    </g>
+
+    <!-- Circuit nodes on elephant -->
+    <g fill="#1e90ff" filter="url(#glow)">
+      <circle cx="80" cy="40" r="2.5"/>
+      <circle cx="25" cy="50" r="2.5"/>
+      <circle cx="100" cy="90" r="2.5"/>
+      <circle cx="30" cy="110" r="2.5"/>
+      <circle cx="50" cy="175" r="2.5"/>
+      <circle cx="70" cy="120" r="2.5"/>
+    </g>
+
+    <!-- Connection lines between nodes -->
+    <g stroke="#1e90ff" stroke-width="0.8" opacity="0.5" stroke-dasharray="3,3">
+      <line x1="80" y1="40" x2="100" y2="90"/>
+      <line x1="25" y1="50" x2="30" y2="110"/>
+      <line x1="70" y1="120" x2="100" y2="90"/>
+    </g>
+  </g>
+
+  <!-- "EADD" text below elephant -->
+  <text x="148" y="310" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="url(#blue-gradient)" text-anchor="middle" letter-spacing="6" filter="url(#glow)">EADD</text>
+  <text x="148" y="332" font-family="Arial, sans-serif" font-size="8" fill="#64748b" text-anchor="middle" letter-spacing="2">ELEPHANT AUTONOMOUS DATA SYSTEMS</text>
+
+  <!-- Vertical divider line -->
+  <line x1="300" y1="60" x2="300" y2="336" stroke="#1e3a5f" stroke-width="1" opacity="0.5"/>
+
+  <!-- RIGHT SIDE: Main Text Content -->
+
+  <!-- Main headline -->
+  <text x="380" y="130" font-family="Arial, sans-serif" font-size="38" font-weight="bold" fill="#ffffff" letter-spacing="-0.5">AI That Builds Your</text>
+  <text x="380" y="178" font-family="Arial, sans-serif" font-size="38" font-weight="bold" fill="url(#text-gradient)" letter-spacing="-0.5">Data Pipelines</text>
+
+  <!-- Flow diagram: chat → pipeline → production -->
+  <g transform="translate(380, 210)">
+    <!-- chat box -->
+    <rect x="0" y="0" width="90" height="32" rx="6" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1"/>
+    <text x="45" y="21" font-family="Arial, sans-serif" font-size="13" fill="#93c5fd" text-anchor="middle" font-weight="500">chat</text>
+
+    <!-- Arrow 1 -->
+    <line x1="98" y1="16" x2="128" y2="16" stroke="#4b5563" stroke-width="1.5"/>
+    <polygon points="128,12 136,16 128,20" fill="#4b5563"/>
+
+    <!-- pipeline box -->
+    <rect x="142" y="0" width="110" height="32" rx="6" fill="#1e3a5f" stroke="#06b6d4" stroke-width="1"/>
+    <text x="197" y="21" font-family="Arial, sans-serif" font-size="13" fill="#67e8f9" text-anchor="middle" font-weight="500">pipeline</text>
+
+    <!-- Arrow 2 -->
+    <line x1="260" y1="16" x2="290" y2="16" stroke="#4b5563" stroke-width="1.5"/>
+    <polygon points="290,12 298,16 290,20" fill="#4b5563"/>
+
+    <!-- production box -->
+    <rect x="304" y="0" width="120" height="32" rx="6" fill="#1e3a5f" stroke="#10b981" stroke-width="1"/>
+    <text x="364" y="21" font-family="Arial, sans-serif" font-size="13" fill="#6ee7b7" text-anchor="middle" font-weight="500">production</text>
+  </g>
+
+  <!-- Subtitle -->
+  <text x="380" y="278" font-family="Arial, sans-serif" font-size="16" fill="#64748b">in minutes, not weeks</text>
+
+  <!-- Cloud platforms bar -->
+  <g transform="translate(380, 305)">
+    <rect x="0" y="0" width="520" height="36" rx="8" fill="#111d35" stroke="#1e3a5f" stroke-width="1"/>
+    <text x="260" y="24" font-family="Arial, sans-serif" font-size="13" fill="#94a3b8" text-anchor="middle" letter-spacing="1.5" font-weight="500">
+      AWS  |  Azure  |  Snowflake  |  dbt  |  Databricks
+    </text>
+  </g>
+
+  <!-- Website URL -->
+  <text x="380" y="370" font-family="Arial, sans-serif" font-size="18" fill="#3b82f6" font-weight="600" filter="url(#glow)">eadd.ai</text>
+
+</svg>
