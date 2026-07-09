@@ -1,0 +1,16 @@
+{
+  "name": "eadd-backend-lambda",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "4.19.2",
+    "cors": "2.8.5",
+    "serverless-http": "3.2.0",
+    "uuid": "9.0.1",
+    "pino": "9.0.0"
+  }
+}
