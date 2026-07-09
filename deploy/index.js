@@ -1,12 +1,74 @@
 /**
  * EADD Backend - Lambda-ready Express API
  * Standalone deployment (no workspace dependencies)
+ * AI: Amazon Nova Lite via AWS Bedrock (free tier eligible)
+ * Fallback to Claude when Anthropic access is approved
  */
 
 const express = require('express');
 const cors = require('cors');
 const serverless = require('serverless-http');
 const { v4: uuidv4 } = require('uuid');
+const { BedrockRuntimeClient, ConverseStreamCommand } = require('@aws-sdk/client-bedrock-runtime');
+
+// Bedrock client — uses Lambda's IAM role (no hardcoded keys)
+const bedrockClient = new BedrockRuntimeClient({ region: process.env.AWS_REGION || 'us-east-1' });
+
+// Model to use — Amazon Nova Lite (free tier, no approval needed)
+// Change to 'us.anthropic.claude-sonnet-5' once Anthropic access is approved
+const AI_MODEL = process.env.AI_MODEL_ID || 'us.amazon.nova-lite-v1:0';
+
+const SYSTEM_PROMPT = `You are EADD, an expert AI data engineering copilot built by Elephant Autonomous Data Systems.
+You build production-ready data pipelines through conversation.
+
+YOUR CAPABILITIES:
+- Generate cloud-agnostic pipeline YAML specs (Bronze/Silver/Gold medallion architecture)
+- Compile pipeline specs to AWS Glue, Azure Data Factory, Snowflake, dbt, Databricks code
+- Create source-to-target column mappings with transformations
+- Generate data quality rules, testing frameworks, and orchestration DAGs
+- Generate CI/CD pipelines (GitHub Actions, GitLab CI)
+
+YOUR APPROACH:
+1. Ask clarifying questions when needed (source system, target cloud, data model)
+2. Generate pipeline specs as YAML first, then compile to target platform
+3. Always include data quality checks
+4. Default to incremental/idempotent patterns
+5. Never include raw credentials — always use secret references
+
+SAFETY: You never see actual row-level data — only schemas and metadata. Production deployments always require human approval.
+
+When generating YAML pipelines, use this structure:
+name, version, source (type, connection, incremental), layers (bronze/silver/gold), quality, orchestration, target.`;
+
+async function callBedrock(messages) {
+  try {
+    const bedrockMessages = messages.map(m => ({
+      role: m.role,
+      content: [{ text: m.content }],
+    }));
+
+    const command = new ConverseStreamCommand({
+      modelId: AI_MODEL,
+      system: [{ text: SYSTEM_PROMPT }],
+      messages: bedrockMessages,
+      inferenceConfig: { maxTokens: 2048, temperature: 0.3 },
+    });
+
+    const response = await bedrockClient.send(command);
+    let fullText = '';
+
+    for await (const event of response.stream) {
+      if (event.contentBlockDelta?.delta?.text) {
+        fullText += event.contentBlockDelta.delta.text;
+      }
+    }
+
+    return fullText;
+  } catch (error) {
+    console.error('[Bedrock Error]', error.message);
+    throw error;
+  }
+}
 
 const app = express();
 
@@ -62,10 +124,10 @@ app.post('/api/conversations', (req, res) => {
 });
 
 // ==========================================
-// Agent Chat (SSE Streaming)
+// Agent Chat (SSE Streaming - REAL AI via Bedrock)
 // ==========================================
 app.post('/api/agent/chat', async (req, res) => {
-  const { conversation_id, message } = req.body;
+  const { conversation_id, message, history } = req.body;
 
   if (!message) {
     return res.status(400).json({ error: 'message is required' });
@@ -79,16 +141,54 @@ app.post('/api/agent/chat', async (req, res) => {
   const messageId = uuidv4();
   res.write(`data: ${JSON.stringify({ type: 'message_start', message_id: messageId })}\n\n`);
 
-  // Generate response based on user input
-  const response = generateResponse(message);
+  try {
+    // Build message history for context
+    const messages = [];
+    if (history && Array.isArray(history)) {
+      for (const h of history.slice(-10)) { // last 10 messages for context
+        messages.push({ role: h.role, content: h.content });
+      }
+    }
+    messages.push({ role: 'user', content: message });
 
-  // Stream the response character by character (simulated)
-  for (let i = 0; i < response.length; i += 3) {
-    const chunk = response.slice(i, i + 3);
-    res.write(`data: ${JSON.stringify({ type: 'content_delta', content: chunk })}\n\n`);
+    // Call REAL Bedrock AI (Nova Lite)
+    const bedrockMessages = messages.map(m => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: [{ text: m.content }],
+    }));
+
+    const command = new ConverseStreamCommand({
+      modelId: AI_MODEL,
+      system: [{ text: SYSTEM_PROMPT }],
+      messages: bedrockMessages,
+      inferenceConfig: { maxTokens: 2048, temperature: 0.3 },
+    });
+
+    const bedrockResponse = await bedrockClient.send(command);
+    let totalTokens = 0;
+
+    for await (const event of bedrockResponse.stream) {
+      if (event.contentBlockDelta?.delta?.text) {
+        const chunk = event.contentBlockDelta.delta.text;
+        res.write(`data: ${JSON.stringify({ type: 'content_delta', content: chunk })}\n\n`);
+      }
+      if (event.metadata?.usage) {
+        totalTokens = event.metadata.usage.totalTokens || 0;
+      }
+    }
+
+    res.write(`data: ${JSON.stringify({ type: 'message_end', message_id: messageId, usage: { total_tokens: totalTokens, model: AI_MODEL, estimated_cost_usd: (totalTokens / 1000000) * 0.06 } })}\n\n`);
+
+  } catch (error) {
+    console.error('[Chat Error]', error.message);
+    // Fallback to simulated response if Bedrock fails
+    const fallback = generateResponse(message);
+    for (let i = 0; i < fallback.length; i += 5) {
+      res.write(`data: ${JSON.stringify({ type: 'content_delta', content: fallback.slice(i, i + 5) })}\n\n`);
+    }
+    res.write(`data: ${JSON.stringify({ type: 'message_end', message_id: messageId, usage: { total_tokens: 0, model: 'fallback' } })}\n\n`);
   }
 
-  res.write(`data: ${JSON.stringify({ type: 'message_end', message_id: messageId, usage: { input_tokens: 150, output_tokens: response.length, estimated_cost_usd: 0.002 } })}\n\n`);
   res.write('data: [DONE]\n\n');
   res.end();
 });
