@@ -13,7 +13,7 @@ export default function Home() {
         </h1>
         <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-10">
           Describe what you need in plain English. Get production-ready pipelines for
-          AWS, Snowflake, dbt, and Databricks — in minutes, not weeks.
+          AWS, Azure, GCP, Snowflake, dbt, Databricks, and On-Premises systems — in minutes, not weeks.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
           <a href="/signup" className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl text-lg font-medium transition">
@@ -23,7 +23,7 @@ export default function Home() {
         <p className="text-sm text-gray-500">No credit card required. 20 messages/day free forever.</p>
         <div className="mt-16 text-gray-500 text-sm">
           Generates production code for:{' '}
-          <span className="text-gray-300 font-medium">AWS | Azure | Snowflake | dbt | Databricks</span>
+          <span className="text-gray-300 font-medium">AWS | Azure | GCP | Snowflake | dbt | Databricks | On-Premises</span>
         </div>
       </div>
     </main>
