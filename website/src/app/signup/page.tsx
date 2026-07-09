@@ -10,10 +10,8 @@ export default function SignupPage() {
   const [error, setError] = useState('');
 
   const handleGoogleSignIn = () => {
-    // Redirect to Clerk's Google OAuth
-    // For now, show a message that Google sign-in is coming soon
-    // Once Clerk is fully deployed, this will use Clerk's SignIn component
-    window.location.href = 'https://accounts.clerk.dev/sign-in?redirect_url=' + encodeURIComponent(window.location.origin + '/chat');
+    // Redirect to your Clerk hosted sign-in page (your specific app)
+    window.location.href = 'https://evident-ladybird-87.clerk.accounts.dev/sign-in?redirect_url=' + encodeURIComponent(window.location.origin + '/chat');
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
