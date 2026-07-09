@@ -1,0 +1,60 @@
+# ============================================================
+# EADD Manual Rollback Workflow
+# Emergency rollback to previous version
+# ============================================================
+
+name: "Emergency Rollback"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to rollback"
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+        required: true
+      rollback_to:
+        description: "Version to rollback to (leave empty for previous)"
+        required: false
+      reason:
+        description: "Reason for rollback"
+        required: true
+
+env:
+  ENVIRONMENT: ${{ inputs.environment }}
+
+jobs:
+  rollback:
+    name: "Rollback ${{ inputs.environment }}"
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets[format('AWS_ROLE_{0}', inputs.environment)] }}
+          aws-region: us-east-1
+
+      - name: Execute rollback
+        run: |
+          echo "🔄 Rolling back ${{ inputs.environment }}..."
+          echo "Reason: ${{ inputs.reason }}"
+          chmod +x cicd/scripts/rollback/rollback.sh
+          cicd/scripts/rollback/rollback.sh ${{ inputs.environment }} "${{ inputs.rollback_to }}"
+
+      - name: Summary
+        run: |
+          echo "## 🔄 Rollback Executed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rollback to | ${{ inputs.rollback_to || 'Previous version' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Reason | ${{ inputs.reason }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Executed by | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Time | $(date -u) |" >> $GITHUB_STEP_SUMMARY

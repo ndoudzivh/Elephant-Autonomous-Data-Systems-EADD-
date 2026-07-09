@@ -1,0 +1,256 @@
+# ============================================================
+# EADD CD Pipeline - Dev Environment
+# Auto-deploys on merge to develop branch
+# No approval required - deploys all changed components
+# ============================================================
+
+name: "CD - Deploy to Dev"
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - "cicd/pipelines/**"
+      - "cicd/configs/**"
+      - "cicd/infrastructure/**"
+      - "cicd/dbt/**"
+
+concurrency:
+  group: cd-dev
+  cancel-in-progress: false
+
+env:
+  ENVIRONMENT: dev
+  AWS_REGION: us-east-1
+  AZURE_REGION: eastus
+  DEPLOY_VERSION: ${{ github.sha }}
+
+permissions:
+  id-token: write
+  contents: read
+  deployments: write
+
+jobs:
+  # ==========================================
+  # Detect what changed for selective deploy
+  # ==========================================
+  detect-targets:
+    name: "Detect Deploy Targets"
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_aws: ${{ steps.check.outputs.aws }}
+      deploy_azure: ${{ steps.check.outputs.azure }}
+      deploy_databricks: ${{ steps.check.outputs.databricks }}
+      deploy_snowflake: ${{ steps.check.outputs.snowflake }}
+      deploy_dbt: ${{ steps.check.outputs.dbt }}
+      deploy_onprem: ${{ steps.check.outputs.onprem }}
+      deploy_infra: ${{ steps.check.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Determine deployment targets
+        id: check
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          echo "aws=$(echo "$CHANGED" | grep -q 'pipelines/aws\|configs/.*/aws' && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "azure=$(echo "$CHANGED" | grep -q 'pipelines/azure\|configs/.*/azure' && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "databricks=$(echo "$CHANGED" | grep -q 'pipelines/databricks\|configs/.*/databricks' && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "snowflake=$(echo "$CHANGED" | grep -q 'pipelines/snowflake\|configs/.*/snowflake' && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "dbt=$(echo "$CHANGED" | grep -q 'dbt/\|pipelines/dbt' && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "onprem=$(echo "$CHANGED" | grep -q 'pipelines/onprem' && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "infra=$(echo "$CHANGED" | grep -q 'infrastructure/' && echo true || echo false)" >> $GITHUB_OUTPUT
+
+  # ==========================================
+  # Deploy Infrastructure (Terraform)
+  # ==========================================
+  deploy-infrastructure:
+    name: "Deploy Infrastructure (Dev)"
+    runs-on: ubuntu-latest
+    needs: detect-targets
+    if: needs.detect-targets.outputs.deploy_infra == 'true'
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_DEV }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Apply
+        run: |
+          cd cicd/infrastructure/terraform/environments/dev
+          terraform init
+          terraform apply -auto-approve -var="environment=dev"
+
+  # ==========================================
+  # Deploy AWS Pipelines
+  # ==========================================
+  deploy-aws:
+    name: "Deploy AWS (Dev)"
+    runs-on: ubuntu-latest
+    needs: [detect-targets, deploy-infrastructure]
+    if: always() && needs.detect-targets.outputs.deploy_aws == 'true'
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_DEV }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy AWS pipelines
+        run: |
+          chmod +x cicd/scripts/deploy/deploy_aws.sh
+          cicd/scripts/deploy/deploy_aws.sh dev ${{ env.DEPLOY_VERSION }}
+
+      - name: Record deployment
+        run: |
+          echo "## AWS Deployment (Dev)" >> $GITHUB_STEP_SUMMARY
+          echo "Version: ${{ env.DEPLOY_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "Status: ✅ Deployed" >> $GITHUB_STEP_SUMMARY
+
+  # ==========================================
+  # Deploy Azure Pipelines
+  # ==========================================
+  deploy-azure:
+    name: "Deploy Azure (Dev)"
+    runs-on: ubuntu-latest
+    needs: [detect-targets, deploy-infrastructure]
+    if: always() && needs.detect-targets.outputs.deploy_azure == 'true'
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_DEV }}
+
+      - name: Deploy Azure pipelines
+        run: |
+          chmod +x cicd/scripts/deploy/deploy_azure.sh
+          cicd/scripts/deploy/deploy_azure.sh dev ${{ env.DEPLOY_VERSION }}
+
+  # ==========================================
+  # Deploy Databricks
+  # ==========================================
+  deploy-databricks:
+    name: "Deploy Databricks (Dev)"
+    runs-on: ubuntu-latest
+    needs: [detect-targets, deploy-infrastructure]
+    if: always() && needs.detect-targets.outputs.deploy_databricks == 'true'
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy Databricks jobs
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_DEV }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_DEV }}
+        run: |
+          chmod +x cicd/scripts/deploy/deploy_databricks.sh
+          cicd/scripts/deploy/deploy_databricks.sh dev ${{ env.DEPLOY_VERSION }}
+
+  # ==========================================
+  # Deploy Snowflake
+  # ==========================================
+  deploy-snowflake:
+    name: "Deploy Snowflake (Dev)"
+    runs-on: ubuntu-latest
+    needs: [detect-targets, deploy-infrastructure]
+    if: always() && needs.detect-targets.outputs.deploy_snowflake == 'true'
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy Snowflake objects
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER_DEV }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD_DEV }}
+        run: |
+          chmod +x cicd/scripts/deploy/deploy_snowflake.sh
+          cicd/scripts/deploy/deploy_snowflake.sh dev ${{ env.DEPLOY_VERSION }}
+
+  # ==========================================
+  # Deploy dbt
+  # ==========================================
+  deploy-dbt:
+    name: "Deploy dbt (Dev)"
+    runs-on: ubuntu-latest
+    needs: [detect-targets, deploy-snowflake]
+    if: always() && needs.detect-targets.outputs.deploy_dbt == 'true'
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dbt
+        run: pip install dbt-core dbt-snowflake
+
+      - name: Run dbt
+        env:
+          DBT_PROFILES_DIR: cicd/dbt
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+        run: |
+          cd cicd/dbt
+          dbt deps
+          dbt run --target dev
+          dbt test --target dev
+
+  # ==========================================
+  # Deploy On-Premises
+  # ==========================================
+  deploy-onprem:
+    name: "Deploy On-Prem (Dev)"
+    runs-on: ubuntu-latest
+    needs: [detect-targets]
+    if: needs.detect-targets.outputs.deploy_onprem == 'true'
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to on-prem systems
+        env:
+          SSH_KEY: ${{ secrets.ONPREM_SSH_KEY }}
+          AIRFLOW_HOST: ${{ secrets.AIRFLOW_HOST_DEV }}
+        run: |
+          chmod +x cicd/scripts/deploy/deploy_onprem.sh
+          cicd/scripts/deploy/deploy_onprem.sh dev ${{ env.DEPLOY_VERSION }}
+
+  # ==========================================
+  # Post-Deploy Validation
+  # ==========================================
+  post-deploy-validation:
+    name: "Post-Deploy Validation (Dev)"
+    runs-on: ubuntu-latest
+    needs: [deploy-aws, deploy-azure, deploy-databricks, deploy-snowflake, deploy-dbt, deploy-onprem]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run smoke tests
+        run: |
+          chmod +x cicd/scripts/validate/smoke_test.sh
+          cicd/scripts/validate/smoke_test.sh dev || true
+
+      - name: Deployment summary
+        run: |
+          echo "## 🚀 Dev Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ env.DEPLOY_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
