@@ -15,11 +15,15 @@ export default function Home() {
           Describe what you need in plain English. Get production-ready pipelines for
           AWS, Azure, GCP, Snowflake, dbt, Databricks, and On-Premises systems — in minutes, not weeks.
         </p>
-        <div className="flex items-center gap-3">
-            <a href="/login" className="text-sm text-gray-400 hover:text-white transition">Log in</a>
-            <a href="/signup" className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition">
-              Start Free
+        <div className="flex items-center justify-center gap-4 mb-4">
+            <a href="/chat" className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl text-lg font-medium transition">
+              Start Building Free →
             </a>
+          </div>
+          <div className="flex items-center justify-center gap-4">
+            <a href="/login" className="text-sm text-gray-400 hover:text-white transition">Log in</a>
+            <span className="text-gray-600">|</span>
+            <a href="/signup" className="text-sm text-gray-400 hover:text-white transition">Sign up</a>
           </div>
         <p className="text-sm text-gray-500">No credit card required. 20 messages/day free forever.</p>
         <div className="mt-16 text-gray-500 text-sm">
