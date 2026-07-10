@@ -119,10 +119,12 @@ layers:
           <div className="flex flex-wrap items-center justify-center gap-8 text-gray-400">
             <span className="text-lg font-semibold">AWS</span>
             <span className="text-lg font-semibold">Azure</span>
+            <span className="text-lg font-semibold">GCP</span>
             <span className="text-lg font-semibold">Snowflake</span>
             <span className="text-lg font-semibold">dbt</span>
             <span className="text-lg font-semibold">Databricks</span>
             <span className="text-lg font-semibold">Airflow</span>
+            <span className="text-lg font-semibold">On-Premises</span>
           </div>
         </div>
       </section>
@@ -143,6 +145,9 @@ layers:
               { icon: Shield, title: 'Data Quality Engine', desc: 'Auto-generates null, unique, range, pattern, and freshness checks with quarantine routing.' },
               { icon: Code, title: 'CI/CD Generation', desc: 'GitHub Actions and GitLab CI pipelines generated with proper environment separation.' },
               { icon: Lock, title: 'Enterprise Security', desc: 'AI never sees row-level data. Only schemas and metadata. Production requires human approval.' },
+              { icon: Cloud, title: 'Cloud Migration', desc: 'Migrate on-premises pipelines (SAS, SSIS, Informatica, stored procedures) to AWS, Azure, GCP, or Databricks with confidence scoring.' },
+              { icon: Zap, title: 'GCP & BigQuery', desc: 'Generate Dataflow pipelines, BigQuery SQL, Cloud Composer DAGs, and GCS configurations for Google Cloud.' },
+              { icon: Database, title: 'On-Premises Support', desc: 'Generate Spark + Airflow + HDFS pipelines for on-prem data lakes. Hybrid cloud support included.' },
             ].map((feature, i) => (
               <div key={i} className="p-6 rounded-xl border border-white/5 bg-white/[0.02] card-hover">
                 <feature.icon className="h-8 w-8 text-blue-400 mb-4" />
