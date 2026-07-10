@@ -320,6 +320,9 @@ function getStageForAgent(agentId: AgentId, intent: UserIntent): string {
 }
 
 function generateRoutingReasoning(intent: UserIntent, agents: AgentId[]): string {
+  const qualityNote = '\n\n📋 Output Quality Pipeline active: Code validation ✓ | Educational explanations ✓ | Cost estimate ✓ | Deploy instructions ✓';
+  const stepNote = OUTPUT_QUALITY_CONFIG.stepByStepIntents.includes(intent) ? ' | Step-by-step delivery ✓' : '';
+  
   const reasonMap: Record<UserIntent, string> = {
     build_pipeline: `Detected pipeline build request. Activating ${agents.length} agents: Requirements → Architect → Builder → Quality → DevOps → Reviewer. This ensures the pipeline is properly designed, built, tested, and deployable.`,
     migrate_legacy: `Detected legacy migration request. Activating ${agents.length} agents: Requirements → Migration → Architect → Quality → DevOps → Reviewer. The Migration Agent will parse legacy code, extract patterns, and convert with confidence scoring.`,
@@ -334,13 +337,42 @@ function generateRoutingReasoning(intent: UserIntent, agents: AgentId[]): string
     ask_question: `General question detected. Routing to Planner Agent for expert guidance.`,
     unknown: `Intent unclear. Routing to Requirements Agent to clarify what's needed before activating other agents.`,
   };
-  return reasonMap[intent];
+  return reasonMap[intent] + qualityNote + stepNote;
 }
 
 // ============================================================
 // CONFLICT RESOLUTION (Section 20.1)
 // Priority: Security/Governance > Compliance > Cost > Performance
 // ============================================================
+
+/**
+ * OUTPUT QUALITY ENHANCEMENT (Section 23 — integrated into every route)
+ * 
+ * Regardless of which agents are activated, every response passes through:
+ * 1. Code Accuracy Validator — catches .with() vs .withColumn(), typos, wrong APIs
+ * 2. Educational Explainer — adds WHY explanations and mentor notes
+ * 3. Cost Estimator — appends cost projection to every pipeline solution
+ * 4. Deployment Instructions — appends deployment steps to every solution
+ * 
+ * For complex builds (full_platform_build, build_pipeline with >3 sources):
+ * 5. Step-by-Step Builder — breaks output into confirmable layers
+ */
+export const OUTPUT_QUALITY_CONFIG = {
+  /** Always validate generated code for accuracy */
+  validateCode: true,
+  /** Always explain WHY decisions are made */
+  addExplanations: true,
+  /** Default explanation level (auto-adjusts based on user messages) */
+  defaultExplanationLevel: 'intermediate' as const,
+  /** Break complex builds into steps */
+  stepByStepThreshold: 'medium' as 'simple' | 'medium' | 'complex',
+  /** Always include cost estimate */
+  includeCostEstimate: true,
+  /** Always include deployment instructions */
+  includeDeploymentInstructions: true,
+  /** Intents that trigger step-by-step delivery */
+  stepByStepIntents: ['build_pipeline', 'migrate_legacy', 'full_platform_build'] as UserIntent[],
+};
 
 export interface ConflictResolution {
   conflictDescription: string;

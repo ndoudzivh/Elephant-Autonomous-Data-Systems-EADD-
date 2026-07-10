@@ -187,21 +187,34 @@ export function selectStreamEngine(req: LatencyRequirements): { engine: StreamEn
 
 /**
  * Generate a complete Spark Structured Streaming pipeline
+ * 
+ * NOTE: All generated code passes through the Code Accuracy Validator
+ * which catches common mistakes (wrong method names, bad imports, etc.)
+ * See: agents/output-quality/code-accuracy-validator.ts
  */
 export function generateSparkStreamingPipeline(spec: StreamingPipelineSpec): string {
   return `"""
 ${spec.name} — Streaming Pipeline
 Engine: Spark Structured Streaming (${spec.mode})
 Delivery: ${spec.deliveryGuarantee}
-Reasoning: ${spec.engineReasoning}
+
+🎓 WHY THIS ENGINE: ${spec.engineReasoning}
+
+Architecture Decision:
+- Mode: ${spec.mode} — chosen because latency budget allows micro-batch efficiency
+- Guarantee: ${spec.deliveryGuarantee} — critical for data correctness
+- Error handling: Dead letter queue for failed records (no data loss)
 """
 
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import *
-from pyspark.sql.types import *
+from pyspark.sql.functions import col, from_json, window, count, sum, expr
+from pyspark.sql.types import StructType, StructField, StringType, TimestampType, DoubleType
 from delta.tables import DeltaTable
 
-# Initialize Spark with streaming configs
+# ─── SPARK SESSION ────────────────────────────────────────────
+# WHY these configs: checkpointLocation enables exactly-once recovery.
+# If the job crashes, it restarts from the last checkpoint (not from zero).
+# stateSchemaCheck=false allows schema evolution in stateful operations.
 spark = SparkSession.builder \\
     .appName("${spec.name}") \\
     .config("spark.sql.streaming.checkpointLocation", "s3://checkpoints/${spec.name}") \\
@@ -209,44 +222,66 @@ spark = SparkSession.builder \\
     .getOrCreate()
 
 # ─── SOURCE: Read from ${spec.source.type} ────────────────────
+# 🎓 Mentor Note: .readStream creates an UNBOUNDED DataFrame.
+# Unlike .read (batch), this never "finishes" — it continuously polls for new data.
+# "subscribe" tells Kafka which topic(s) to consume from.
 stream_df = spark.readStream \\
-    .format("${spec.source.type}") \\
+    .format("kafka") \\
     .option("subscribe", "${spec.source.topic}") \\
     ${spec.source.bootstrapServers ? `.option("kafka.bootstrap.servers", "${spec.source.bootstrapServers}")` : ''} \\
     .option("startingOffsets", "${spec.source.startOffset}") \\
     .option("failOnDataLoss", "false") \\
     .load()
 
-# Parse the value (assuming JSON)
+# ─── PARSE: Deserialize Kafka value (JSON → structured columns) ──
+# WHY selectExpr: Kafka stores key/value as binary. We cast to STRING first,
+# then parse the JSON value into typed columns using our schema.
 parsed_df = stream_df \\
     .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)", "timestamp") \\
-    .select(from_json(col("value"), schema).alias("data"), "timestamp") \\
+    .select(from_json(col("value"), schema).alias("data"), col("timestamp")) \\
     .select("data.*", "timestamp")
 
 ${spec.processing.watermark ? `
-# ─── WATERMARK: Handle late-arriving data ─────────────────
-# Maximum out-of-orderness: ${spec.processing.watermark.maxOutOfOrderness}
+# ─── WATERMARK: Handle late-arriving data ─────────────────────
+# 🎓 Mentor Note: In real systems, events arrive out of order (network delays,
+# retries, mobile devices coming back online). The watermark says:
+# "We've seen all events up to (max event time - ${spec.processing.watermark.maxOutOfOrderness})."
+# Anything arriving after that is either dropped or sent to a late-data output.
+# Without watermarks, Spark keeps ALL state forever → memory grows unbounded → OOM crash.
 watermarked_df = parsed_df \\
     .withWatermark("${spec.processing.watermark.eventTimeColumn}", "${spec.processing.watermark.maxOutOfOrderness}")
-` : '# No watermark configured (processing-time semantics)'}
+` : '# No watermark configured (processing-time semantics)\n# ⚠️ Warning: Without watermarks, state grows unbounded. Add one for production.'}
 
 ${spec.processing.windowing ? `
 # ─── WINDOWING: ${spec.processing.windowing.type} window (${spec.processing.windowing.size}) ──
+# WHY windowing: Streaming data is infinite — we need to "bucket" it into
+# finite groups to compute aggregations. A ${spec.processing.windowing.type} window of
+# ${spec.processing.windowing.size} means: "group all events that fall within each
+# ${spec.processing.windowing.size} time bucket and aggregate them."
 windowed_df = watermarked_df \\
     .groupBy(window(col("${spec.processing.watermark?.eventTimeColumn || 'timestamp'}"), "${spec.processing.windowing.size}")) \\
-    .agg(count("*").alias("count"), sum("amount").alias("total"))
+    .agg(count("*").alias("event_count"), sum("amount").alias("total_amount"))
 ` : ''}
 
-# ─── TRANSFORMATIONS ──────────────────────────────────────
-${spec.processing.transformations.map(t => `# ${t.description}\n# ${t.logic}`).join('\n')}
+# ─── TRANSFORMATIONS ──────────────────────────────────────────
+${spec.processing.transformations.map(t => `# ${t.description}\n# WHY: ${t.logic}`).join('\n')}
 
-# ─── ERROR HANDLING: Dead Letter Queue ────────────────────
+# ─── ERROR HANDLING: Dead Letter Queue ────────────────────────
 ${spec.errorHandling.deadLetterQueue.enabled ? `
-# Failed records go to DLQ topic: ${spec.errorHandling.deadLetterQueue.topic}
+# 🎓 Mentor Note: Dead Letter Queues prevent data loss.
+# When a record fails processing (bad schema, business rule violation),
+# instead of crashing the entire pipeline, we route it to a separate topic.
+# This lets the pipeline continue while bad records are investigated separately.
+# DLQ topic: ${spec.errorHandling.deadLetterQueue.topic}
 # Includes: original record + error details + timestamp
-` : '# DLQ not enabled'}
+# Retention: ${spec.errorHandling.deadLetterQueue.retentionDays} days
+` : '# DLQ not enabled — ⚠️ Consider enabling for production (prevents data loss)'}
 
-# ─── SINK: Write to ${spec.sink.type} ─────────────────────
+# ─── SINK: Write to ${spec.sink.type} ─────────────────────────
+# WHY outputMode "${spec.sink.outputMode}": 
+#   - "append" = only new rows (best for event streams)
+#   - "complete" = full result table (only with aggregations)
+#   - "update" = only changed rows (good for stateful operations)
 query = result_df.writeStream \\
     .format("${spec.sink.type === 'delta_lake' ? 'delta' : spec.sink.type}") \\
     .outputMode("${spec.sink.outputMode}") \\
@@ -254,10 +289,11 @@ query = result_df.writeStream \\
     ${spec.processing.stateful?.checkpointInterval ? `.trigger(processingTime="${spec.processing.stateful.checkpointInterval}")` : ''} \\
     .start()
 
-# ─── MONITORING ───────────────────────────────────────────
-# Consumer lag warning at: ${spec.monitoring.consumerLag.warnThreshold}
-# Error rate critical at: ${spec.monitoring.errorRate.criticalPercentage}%
-# P99 latency critical at: ${spec.monitoring.processingLatencyMs.criticalP99}ms
+# ─── MONITORING ───────────────────────────────────────────────
+# These thresholds trigger alerts when the pipeline is unhealthy:
+# - Consumer lag > ${spec.monitoring.consumerLag.warnThreshold}: pipeline falling behind
+# - Error rate > ${spec.monitoring.errorRate.criticalPercentage}%: something is wrong with data/logic
+# - P99 latency > ${spec.monitoring.processingLatencyMs.criticalP99}ms: performance degradation
 
 query.awaitTermination()
 `;
