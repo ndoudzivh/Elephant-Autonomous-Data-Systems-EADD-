@@ -347,66 +347,71 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {/* Input row with action buttons */}
-              <div className="relative flex items-end gap-2">
-                {/* Action buttons (left side) */}
-                <div className="flex items-center gap-1 pb-2">
-                  {/* File upload */}
+              {/* Input row */}
+              <div className="relative">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={handleTextareaChange}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Describe what you need..."
+                  rows={1}
+                  disabled={loading}
+                  className="w-full px-4 py-3 bg-[#111d35] border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500 resize-none disabled:opacity-50"
+                />
+                <button
+                  onClick={() => sendMessage()}
+                  disabled={(!input.trim() && attachedFiles.length === 0) || loading}
+                  className="absolute right-3 top-3 p-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 rounded-lg transition"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </button>
+              </div>
+
+              {/* Toolbar row — Kiro style */}
+              <div className="flex items-center justify-between mt-2 px-1">
+                {/* Left: Action buttons (green/highlighted) */}
+                <div className="flex items-center gap-1">
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
-                    title="Upload file (CSV, SQL, YAML, .sas, .dtsx)"
+                    className="flex items-center gap-1 px-2 py-1 text-green-400 hover:bg-green-400/10 rounded-md transition text-xs"
+                    title="Upload file"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13"/></svg>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/></svg>
                   </button>
-                  {/* Image upload */}
                   <button
-                    onClick={() => imageInputRef.current?.click()}
-                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
-                    title="Upload image (architecture diagram, ERD, screenshot)"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1 px-2 py-1 text-green-400 hover:bg-green-400/10 rounded-md transition text-xs"
+                    title="Attach file (CSV, SQL, YAML, requirements doc)"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z"/></svg>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13"/></svg>
                   </button>
-                  {/* Connect repo */}
                   <button
                     onClick={() => setShowRepoModal(true)}
-                    className={`p-2 rounded-lg transition ${connectedRepo ? 'text-green-400 bg-green-400/10' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
-                    title={connectedRepo ? `Connected: ${connectedRepo}` : "Connect GitHub/GitLab repo"}
+                    className="flex items-center gap-1.5 px-2 py-1 text-green-400 hover:bg-green-400/10 rounded-md transition text-xs"
+                    title="Connect GitHub/GitLab repo"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.475a4.5 4.5 0 00-6.364-6.364L4.5 8.737"/></svg>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                    <span>{connectedRepo ? connectedRepo.split('/').pop() : 'Select repo'}</span>
                   </button>
                 </div>
 
-                {/* Textarea */}
-                <div className="flex-1 relative">
-                  <textarea
-                    ref={inputRef}
-                    value={input}
-                    onChange={handleTextareaChange}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Ask a follow-up..."
-                    rows={1}
-                    disabled={loading}
-                    className="w-full px-4 py-3 pr-12 bg-[#111d35] border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500 resize-none disabled:opacity-50"
-                  />
-                  <button
-                    onClick={() => sendMessage()}
-                    disabled={(!input.trim() && attachedFiles.length === 0) || loading}
-                    className="absolute right-3 bottom-3 p-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 rounded-lg transition"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7"/></svg>
-                  </button>
+                {/* Right: Model + Mode */}
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-gray-500">Nova Lite</span>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                    <span>🤖</span>
+                    <span>Autonomous</span>
+                    <div className="w-8 h-4 bg-gray-700 rounded-full relative cursor-pointer">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full absolute top-0.5 right-0.5"></div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Hidden file inputs */}
-              <input ref={fileInputRef} type="file" className="hidden" accept=".csv,.json,.yaml,.yml,.sql,.py,.sas,.dtsx,.xml,.parquet,.txt,.md" multiple onChange={(e) => handleFileUpload(e, 'file')} />
+              <input ref={fileInputRef} type="file" className="hidden" accept=".csv,.json,.yaml,.yml,.sql,.py,.sas,.dtsx,.xml,.parquet,.txt,.md,.pdf,.doc,.docx" multiple onChange={(e) => handleFileUpload(e, 'file')} />
               <input ref={imageInputRef} type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'image')} />
-
-              {/* Supported formats hint */}
-              <p className="text-[10px] text-gray-600 mt-2 text-center">
-                📎 Files: CSV, SQL, YAML, Python, SAS, SSIS (.dtsx) | 🖼️ Images: PNG, JPG | 🔗 Repos: GitHub, GitLab
-              </p>
             </div>
 
             {/* Repo Connect Modal */}
