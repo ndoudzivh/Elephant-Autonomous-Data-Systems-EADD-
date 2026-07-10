@@ -171,6 +171,9 @@ export type UserIntent =
   | 'setup_governance'        // Lineage, compliance, security
   | 'deploy_infrastructure'   // CI/CD, Terraform, deployment
   | 'full_platform_build'     // Everything — complete data platform
+  | 'analyze_requirement'     // Read a requirement doc and build the full solution
+  | 'file_uploaded'           // User uploaded a file — discover schema + suggest pipeline
+  | 'repo_connected'          // User connected a repo — scan for pipelines
   | 'ask_question'            // General question/advice
   | 'unknown';                // Can't determine — ask Requirements Agent
 
@@ -189,6 +192,9 @@ export const ROUTING_RULES: Record<UserIntent, AgentId[]> = {
   setup_governance: ['governance', 'devops'],
   deploy_infrastructure: ['devops', 'optimizer'],
   full_platform_build: ['requirements', 'planner', 'architect', 'builder', 'quality', 'governance', 'devops', 'optimizer', 'reviewer', 'observability'],
+  analyze_requirement: ['requirements', 'planner', 'architect', 'builder', 'quality', 'devops', 'optimizer', 'reviewer'],
+  file_uploaded: ['quality', 'architect', 'builder'],
+  repo_connected: ['planner', 'migration', 'quality'],
   ask_question: ['planner'],
   unknown: ['requirements'],
 };
@@ -237,6 +243,18 @@ export function routeRequest(userMessage: string): ExecutionPlan {
 }
 
 function classifyIntent(text: string): UserIntent {
+  // Requirement document analysis
+  if (/requirement|assessment|case study|deliverable|evaluation criteria|tasks.*instructions/i.test(text)) {
+    return 'analyze_requirement';
+  }
+  // File uploaded
+  if (/uploaded|file.*attached|attached.*file|\.csv|\.json.*uploaded|schema.*discover/i.test(text)) {
+    return 'file_uploaded';
+  }
+  // Repo connected
+  if (/repo.*connect|connect.*repo|github\.com|gitlab\.com|scan.*repo|analyze.*repo/i.test(text)) {
+    return 'repo_connected';
+  }
   // Migration indicators
   if (/migrat|legacy|moderniz|ssis|sas\b|informatica|talend|datastage|convert from|move from/.test(text)) {
     return 'migrate_legacy';
@@ -334,6 +352,9 @@ function generateRoutingReasoning(intent: UserIntent, agents: AgentId[]): string
     setup_governance: `Detected governance/compliance request. Activating Governance + DevOps for lineage, security, and policy enforcement.`,
     deploy_infrastructure: `Detected deployment request. Activating DevOps + Optimizer for CI/CD and infrastructure provisioning with cost awareness.`,
     full_platform_build: `Detected full platform build request. Activating ALL agents (${agents.length}). This is a comprehensive engagement covering architecture through deployment.`,
+    analyze_requirement: `Detected requirement document analysis. Activating ${agents.length} agents to read, interpret, and build the complete solution end-to-end. Will break into layers and ask for confirmation at each step.`,
+    file_uploaded: `File uploaded. Activating Quality (schema discovery) → Architect (design) → Builder (generate pipeline). Will auto-discover schema and suggest a pipeline.`,
+    repo_connected: `Repository connected. Activating Planner (analyze) → Migration (detect patterns) → Quality (assess). Will scan for existing pipelines, schemas, and improvement opportunities.`,
     ask_question: `General question detected. Routing to Planner Agent for expert guidance.`,
     unknown: `Intent unclear. Routing to Requirements Agent to clarify what's needed before activating other agents.`,
   };
@@ -371,7 +392,7 @@ export const OUTPUT_QUALITY_CONFIG = {
   /** Always include deployment instructions */
   includeDeploymentInstructions: true,
   /** Intents that trigger step-by-step delivery */
-  stepByStepIntents: ['build_pipeline', 'migrate_legacy', 'full_platform_build'] as UserIntent[],
+  stepByStepIntents: ['build_pipeline', 'migrate_legacy', 'full_platform_build', 'analyze_requirement'] as UserIntent[],
 };
 
 export interface ConflictResolution {

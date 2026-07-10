@@ -12,6 +12,8 @@ import { pipelineRouter } from './routes/pipelines';
 import { executionRouter } from './routes/executions';
 import { agentRouter } from './routes/agent';
 import { healthRouter } from './routes/health';
+import { repoConnectRouter } from './routes/repo-connect';
+import { fileUploadRouter } from './routes/file-upload';
 import { errorHandler } from './middleware/error-handler';
 import { requestLogger } from './middleware/request-logger';
 import { authMiddleware } from './middleware/auth';
@@ -26,7 +28,7 @@ export function createApp() {
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     credentials: true,
   }));
-  app.use(express.json({ limit: '10mb' }));
+  app.use(express.json({ limit: '50mb' }));
 
   // Rate limiting
   const limiter = rateLimit({
@@ -48,6 +50,8 @@ export function createApp() {
   app.use('/api/pipelines', authMiddleware, pipelineRouter);
   app.use('/api/executions', authMiddleware, executionRouter);
   app.use('/api/agent', authMiddleware, agentRouter);
+  app.use('/api/repos', authMiddleware, repoConnectRouter);
+  app.use('/api/files', authMiddleware, fileUploadRouter);
 
   // Error handling
   app.use(errorHandler);

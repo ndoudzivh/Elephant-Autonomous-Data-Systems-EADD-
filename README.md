@@ -1,16 +1,26 @@
-# EADPA — Enterprise Autonomous Data Pipeline Agent
+# EADD — Elephant Autonomous Data Systems
 
-> AI-powered data engineering copilot that builds, tests, and deploys production data pipelines through conversation.
+> AI-powered data engineering platform that builds, tests, and deploys production data pipelines through conversation.
 
-## What is EADPA?
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-EADD_AI-blue?logo=linkedin)](https://www.linkedin.com/company/elephant-autonomous-data-systems-eadd-ai-/)
+[![Live Demo](https://img.shields.io/badge/Live-elephant--pod.vercel.app-green)](https://elephant-pod.vercel.app)
+[![GitHub](https://img.shields.io/badge/GitHub-ndoudzivh-black?logo=github)](https://github.com/ndoudzivh/Elephant-Autonomous-Data-Systems-EADD-)
 
-EADPA is a conversational AI agent that works as a data engineer's copilot. Describe the pipeline you need in plain English, and it generates production-ready code — complete with data quality checks, orchestration, CI/CD, and infrastructure-as-code.
+## What is EADD?
 
-**It is:**
-- A chat-driven agent (like ChatGPT/Claude, but for data engineering)
-- A YAML-driven pipeline compiler with pluggable cloud backends
-- A source-to-target mapping and data modeling tool
-- A system with a hard boundary between "generate/test" (autonomous) and "touch real data" (human-approved)
+EADD is a multi-agent AI platform that works as an entire data engineering team. Describe the pipeline you need in plain English, and it generates production-ready code — complete with Lakehouse Bronze/Silver/Gold architecture, data quality checks, cost estimates, educational explanations, and deployment instructions.
+
+**Key Features:**
+- 🤖 **12 Specialized AI Agents** with dynamic routing
+- 🏛️ **Lakehouse Architecture** (Bronze → Silver → Gold medallion layers)
+- 📝 **Code Accuracy Validation** (catches .with() → .withColumn() and 50+ common mistakes)
+- 🎓 **Educational Explanations** (explains WHY every decision is made, like a mentor)
+- 📊 **Step-by-Step Delivery** (complex builds broken into confirmable layers)
+- 💰 **Cost Estimates** on every solution (ZAR + USD, scaling projections)
+- 🚀 **Deployment Instructions** at the end of every solution
+- 📁 **File Upload** with auto-schema discovery and pipeline generation
+- 🔗 **Repo Connect** (GitHub/GitLab) with pipeline/schema scanning
+- 🔐 **Policy Gate** — production deploys require human approval
 
 **It is NOT:**
 - A system where the LLM ever sees row-level data

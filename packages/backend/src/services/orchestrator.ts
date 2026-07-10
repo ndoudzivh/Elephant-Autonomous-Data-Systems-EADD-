@@ -21,6 +21,7 @@ import type {
 import { ConversationService } from './conversation';
 import { PipelineService } from './pipeline';
 import { BedrockClient } from './bedrock-client';
+import { enhanceResponse, EnhancementContext, DEFAULT_CONFIG } from './response-enhancer';
 
 interface ProcessMessageParams {
   conversationId: string;
@@ -160,13 +161,31 @@ export class AgentOrchestrator {
       }
 
       // Save assistant message
+      // ─── OUTPUT QUALITY PIPELINE ────────────────────────────────
+      // Enhance the raw LLM output with:
+      // 1. Code accuracy fixes (typo correction)
+      // 2. Educational mentor notes
+      // 3. Lakehouse architecture context (if pipeline-related)
+      // 4. Cost estimates
+      // 5. Deployment instructions
+      const enhancementContext: EnhancementContext = {
+        userMessage: params.message,
+        pipelineName: this.extractPipelineName(params.message),
+        platform: this.extractPlatform(params.message),
+        dailyVolumeGB: 10,
+        frequency: 'daily',
+        isComplexBuild: fullContent.length > 2000,
+      };
+
+      const enhancedContent = enhanceResponse(fullContent, enhancementContext, DEFAULT_CONFIG);
+
       const assistantMessage: Message = {
         id: messageId,
         conversation_id: params.conversationId,
         role: 'assistant',
-        content: fullContent,
+        content: enhancedContent,
         status: 'complete',
-        blocks: this.parseContentBlocks(fullContent),
+        blocks: this.parseContentBlocks(enhancedContent),
         tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
         artifacts: artifacts.length > 0 ? artifacts : undefined,
         usage,
@@ -491,5 +510,34 @@ ${context ? `\nCURRENT CONTEXT:\n${JSON.stringify(context)}` : ''}`;
     const inputCostPer1K = 0.003;
     const outputCostPer1K = 0.015;
     return (inputTokens / 1000) * inputCostPer1K + (outputTokens / 1000) * outputCostPer1K;
+  }
+
+  /**
+   * Extract pipeline name from user message
+   */
+  private extractPipelineName(message: string): string | undefined {
+    const patterns = [
+      /(?:build|create|generate|deploy)\s+(?:a\s+)?(?:pipeline\s+)?(?:called|named)\s+["']?(\w[\w-]+)/i,
+      /pipeline\s+(?:for|from)\s+(\w[\w-]+)/i,
+      /(\w[\w-]+)\s+pipeline/i,
+    ];
+    for (const pattern of patterns) {
+      const match = message.match(pattern);
+      if (match) return match[1];
+    }
+    return undefined;
+  }
+
+  /**
+   * Extract target platform from user message
+   */
+  private extractPlatform(message: string): string | undefined {
+    const lower = message.toLowerCase();
+    if (/snowflake/i.test(lower)) return 'snowflake';
+    if (/databricks/i.test(lower)) return 'databricks';
+    if (/azure|adf|synapse/i.test(lower)) return 'azure';
+    if (/gcp|bigquery|dataflow/i.test(lower)) return 'gcp';
+    if (/aws|glue|redshift|s3/i.test(lower)) return 'aws';
+    return undefined;
   }
 }
