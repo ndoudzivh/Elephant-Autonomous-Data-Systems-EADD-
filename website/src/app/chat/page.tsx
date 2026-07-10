@@ -8,6 +8,15 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  attachments?: AttachedFile[];
+}
+
+interface AttachedFile {
+  name: string;
+  type: 'file' | 'image' | 'repo';
+  size?: number;
+  content?: string;
+  preview?: string;
 }
 
 interface Conversation {
@@ -23,8 +32,13 @@ export default function ChatPage() {
   const [streamingContent, setStreamingContent] = useState('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [showRepoModal, setShowRepoModal] = useState(false);
+  const [connectedRepo, setConnectedRepo] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -51,9 +65,10 @@ export default function ChatPage() {
     const msgText = text || input.trim();
     if (!msgText || loading) return;
 
-    const userMsg: Message = { id: Date.now().toString(), role: 'user', content: msgText };
+    const userMsg: Message = { id: Date.now().toString(), role: 'user', content: msgText, attachments: attachedFiles.length > 0 ? [...attachedFiles] : undefined };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
+    setAttachedFiles([]);
     setLoading(true);
     setStreamingContent('');
 
@@ -65,7 +80,7 @@ export default function ChatPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: msgText,
+          message: msgText + (userMsg.attachments?.length ? `\n\n[Attached files: ${userMsg.attachments.map(f => f.name).join(', ')}]${userMsg.attachments.filter(f => f.content).map(f => `\n\n--- File: ${f.name} ---\n${f.content?.slice(0, 5000)}`).join('')}` : ''),
           conversation_id: 'chat-1',
           history: messages.map(m => ({ role: m.role, content: m.content })),
         }),
@@ -113,6 +128,34 @@ export default function ChatPage() {
       e.preventDefault();
       sendMessage();
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, fileType: 'file' | 'image') => {
+    const files = e.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const newFile: AttachedFile = {
+          name: file.name,
+          type: fileType,
+          size: file.size,
+          content: fileType === 'file' ? reader.result as string : undefined,
+          preview: fileType === 'image' ? reader.result as string : undefined,
+        };
+        setAttachedFiles(prev => [...prev, newFile]);
+      };
+
+      if (fileType === 'image') {
+        reader.readAsDataURL(file);
+      } else {
+        reader.readAsText(file);
+      }
+    });
+
+    // Reset input so same file can be re-uploaded
+    e.target.value = '';
   };
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -290,25 +333,120 @@ export default function ChatPage() {
         {/* Bottom Input (when conversation is active) */}
         {!showWelcome && (
           <div className="border-t border-gray-800 px-4 py-4">
-            <div className="max-w-3xl mx-auto relative">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={handleTextareaChange}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask a follow-up..."
-                rows={1}
-                disabled={loading}
-                className="w-full px-4 py-3 pr-12 bg-[#111d35] border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500 resize-none disabled:opacity-50"
-              />
-              <button
-                onClick={() => sendMessage()}
-                disabled={!input.trim() || loading}
-                className="absolute right-3 bottom-3 p-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 rounded-lg transition"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7"/></svg>
-              </button>
+            <div className="max-w-3xl mx-auto">
+              {/* Attached files preview */}
+              {attachedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {attachedFiles.map((file, i) => (
+                    <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/10 border border-blue-500/20 rounded-lg text-xs">
+                      <span>{file.type === 'image' ? '🖼️' : file.type === 'repo' ? '🔗' : '📄'}</span>
+                      <span className="text-gray-300 max-w-[150px] truncate">{file.name}</span>
+                      <button onClick={() => setAttachedFiles(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-500 hover:text-red-400">×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Input row with action buttons */}
+              <div className="relative flex items-end gap-2">
+                {/* Action buttons (left side) */}
+                <div className="flex items-center gap-1 pb-2">
+                  {/* File upload */}
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+                    title="Upload file (CSV, SQL, YAML, .sas, .dtsx)"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13"/></svg>
+                  </button>
+                  {/* Image upload */}
+                  <button
+                    onClick={() => imageInputRef.current?.click()}
+                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+                    title="Upload image (architecture diagram, ERD, screenshot)"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z"/></svg>
+                  </button>
+                  {/* Connect repo */}
+                  <button
+                    onClick={() => setShowRepoModal(true)}
+                    className={`p-2 rounded-lg transition ${connectedRepo ? 'text-green-400 bg-green-400/10' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                    title={connectedRepo ? `Connected: ${connectedRepo}` : "Connect GitHub/GitLab repo"}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.475a4.5 4.5 0 00-6.364-6.364L4.5 8.737"/></svg>
+                  </button>
+                </div>
+
+                {/* Textarea */}
+                <div className="flex-1 relative">
+                  <textarea
+                    ref={inputRef}
+                    value={input}
+                    onChange={handleTextareaChange}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Ask a follow-up..."
+                    rows={1}
+                    disabled={loading}
+                    className="w-full px-4 py-3 pr-12 bg-[#111d35] border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500 resize-none disabled:opacity-50"
+                  />
+                  <button
+                    onClick={() => sendMessage()}
+                    disabled={(!input.trim() && attachedFiles.length === 0) || loading}
+                    className="absolute right-3 bottom-3 p-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 rounded-lg transition"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Hidden file inputs */}
+              <input ref={fileInputRef} type="file" className="hidden" accept=".csv,.json,.yaml,.yml,.sql,.py,.sas,.dtsx,.xml,.parquet,.txt,.md" multiple onChange={(e) => handleFileUpload(e, 'file')} />
+              <input ref={imageInputRef} type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'image')} />
+
+              {/* Supported formats hint */}
+              <p className="text-[10px] text-gray-600 mt-2 text-center">
+                📎 Files: CSV, SQL, YAML, Python, SAS, SSIS (.dtsx) | 🖼️ Images: PNG, JPG | 🔗 Repos: GitHub, GitLab
+              </p>
             </div>
+
+            {/* Repo Connect Modal */}
+            {showRepoModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowRepoModal(false)}>
+                <div className="bg-[#111d35] border border-gray-700 rounded-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+                  <h3 className="font-bold text-lg mb-4">🔗 Connect Repository</h3>
+                  <p className="text-sm text-gray-400 mb-4">Connect a GitHub or GitLab repo so EADD can analyze your existing code and pipelines.</p>
+                  <input
+                    type="text"
+                    placeholder="https://github.com/username/repo"
+                    className="w-full px-4 py-3 bg-[#0a1628] border border-gray-600 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500 mb-3"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const val = (e.target as HTMLInputElement).value;
+                        if (val) {
+                          setConnectedRepo(val);
+                          setAttachedFiles(prev => [...prev, { name: val.split('/').slice(-1)[0], type: 'repo' }]);
+                          setShowRepoModal(false);
+                        }
+                      }
+                    }}
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowRepoModal(false)} className="flex-1 px-4 py-2 border border-gray-600 rounded-lg text-sm hover:bg-gray-800 transition">Cancel</button>
+                    <button
+                      onClick={() => {
+                        const input = document.querySelector<HTMLInputElement>('[placeholder*="github"]');
+                        if (input?.value) {
+                          setConnectedRepo(input.value);
+                          setAttachedFiles(prev => [...prev, { name: input.value.split('/').slice(-1)[0], type: 'repo' }]);
+                          setShowRepoModal(false);
+                        }
+                      }}
+                      className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm transition"
+                    >Connect</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
