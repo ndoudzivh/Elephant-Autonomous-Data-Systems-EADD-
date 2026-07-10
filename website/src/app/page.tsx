@@ -28,8 +28,8 @@ export default function HomePage() {
             <a href="#pricing" className="hover:text-white transition">Pricing</a>
           </div>
           <div className="flex items-center gap-3">
-            <a href="/login" className="text-sm text-gray-400 hover:text-white transition">Log in</a>
-            <a href="/signup" className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition">
+            <a href="/chat" className="text-sm text-gray-400 hover:text-white transition">Log in</a>
+            <a href="/chat" className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition">
               Start Free
             </a>
           </div>
@@ -55,7 +55,7 @@ export default function HomePage() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            <a href="/signup" className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl text-lg font-medium transition shadow-lg shadow-blue-600/20">
+            <a href="/chat" className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl text-lg font-medium transition shadow-lg shadow-blue-600/20">
               Start Building Free <ArrowRight className="h-5 w-5" />
             </a>
             <a href="#demo" className="w-full sm:w-auto flex items-center justify-center gap-2 border border-white/10 hover:border-white/20 px-8 py-4 rounded-xl text-lg transition">
@@ -202,7 +202,7 @@ layers:
                 <span className="text-4xl font-bold">$0</span>
                 <span className="text-gray-400">/month</span>
               </div>
-              <a href="/signup" className="block text-center border border-white/20 hover:border-white/40 py-3 rounded-lg text-sm font-medium transition mb-6">Get Started</a>
+              <a href="/chat" className="block text-center border border-white/20 hover:border-white/40 py-3 rounded-lg text-sm font-medium transition mb-6">Get Started</a>
               <ul className="space-y-3 text-sm text-gray-300">
                 {['20 messages/day', '3 pipelines', 'AWS backend only', '100K tokens/month', 'Community support', 'Code export'].map(f => (
                   <li key={f} className="flex items-start gap-2"><Check className="h-4 w-4 text-green-400 shrink-0 mt-0.5" />{f}</li>
@@ -259,7 +259,7 @@ layers:
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to stop writing boilerplate?</h2>
           <p className="text-gray-400 text-lg mb-8">Join 100+ data engineers building pipelines 100x faster.</p>
-          <a href="/signup" className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl text-lg font-medium transition shadow-lg shadow-blue-600/20">
+          <a href="/chat" className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl text-lg font-medium transition shadow-lg shadow-blue-600/20">
             Start Building Free <ArrowRight className="h-5 w-5" />
           </a>
           <p className="text-sm text-gray-500 mt-4">No credit card required</p>
