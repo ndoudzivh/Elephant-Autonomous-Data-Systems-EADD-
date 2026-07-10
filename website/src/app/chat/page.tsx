@@ -473,8 +473,122 @@ function FormattedContent({ content }: { content: string }) {
             );
           }
         }
-        return <span key={i}>{part}</span>;
+        // Render markdown-like text
+        return <MarkdownText key={i} text={part} />;
       })}
     </>
   );
+}
+
+function MarkdownText({ text }: { text: string }) {
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+  let tableRows: string[] = [];
+  let inTable = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Table detection
+    if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+      if (!inTable) { inTable = true; tableRows = []; }
+      if (!line.match(/^\|[\s-|]+\|$/)) { // Skip separator rows
+        tableRows.push(line);
+      }
+      continue;
+    } else if (inTable) {
+      // End of table
+      elements.push(<SimpleTable key={`tbl-${i}`} rows={tableRows} />);
+      tableRows = [];
+      inTable = false;
+    }
+
+    // Horizontal rule
+    if (line.trim() === '---' || line.trim() === '***') {
+      elements.push(<hr key={i} className="my-3 border-gray-700" />);
+      continue;
+    }
+    // Headers
+    if (line.startsWith('## ')) {
+      elements.push(<h3 key={i} className="text-base font-bold mt-4 mb-2">{renderInline(line.slice(3))}</h3>);
+      continue;
+    }
+    if (line.startsWith('# ')) {
+      elements.push(<h2 key={i} className="text-lg font-bold mt-4 mb-2">{renderInline(line.slice(2))}</h2>);
+      continue;
+    }
+    // Blockquote
+    if (line.startsWith('> ')) {
+      elements.push(<blockquote key={i} className="border-l-2 border-blue-500 pl-3 my-2 text-gray-300">{renderInline(line.slice(2))}</blockquote>);
+      continue;
+    }
+    // Bullet list
+    if (line.match(/^[\s]*[•\-\*]\s/)) {
+      elements.push(<li key={i} className="ml-4 list-disc">{renderInline(line.replace(/^[\s]*[•\-\*]\s/, ''))}</li>);
+      continue;
+    }
+    // Numbered list
+    if (line.match(/^\d+\.\s/)) {
+      elements.push(<li key={i} className="ml-4 list-decimal">{renderInline(line.replace(/^\d+\.\s/, ''))}</li>);
+      continue;
+    }
+    // Empty line
+    if (line.trim() === '') {
+      elements.push(<div key={i} className="h-2" />);
+      continue;
+    }
+    // Regular paragraph
+    elements.push(<p key={i} className="my-0.5">{renderInline(line)}</p>);
+  }
+
+  // Flush any remaining table
+  if (inTable && tableRows.length > 0) {
+    elements.push(<SimpleTable key="tbl-end" rows={tableRows} />);
+  }
+
+  return <>{elements}</>;
+}
+
+function SimpleTable({ rows }: { rows: string[] }) {
+  if (rows.length === 0) return null;
+  const parseRow = (row: string) => row.split('|').filter(c => c.trim() !== '').map(c => c.trim());
+  const header = parseRow(rows[0]);
+  const body = rows.slice(1).map(parseRow);
+
+  return (
+    <div className="my-3 overflow-x-auto">
+      <table className="w-full text-xs border-collapse">
+        <thead>
+          <tr className="border-b border-gray-700">
+            {header.map((h, i) => <th key={i} className="text-left py-1.5 px-2 text-gray-300 font-medium">{h}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {body.map((row, ri) => (
+            <tr key={ri} className="border-b border-gray-800">
+              {row.map((cell, ci) => <td key={ci} className="py-1.5 px-2 text-gray-400">{renderInline(cell)}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function renderInline(text: string): React.ReactNode {
+  // Bold: **text**
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} className="text-white font-semibold">{part.slice(2, -2)}</strong>;
+    }
+    // Inline code: `text`
+    const codeParts = part.split(/(`[^`]+`)/g);
+    return codeParts.map((cp, j) => {
+      if (cp.startsWith('`') && cp.endsWith('`')) {
+        return <code key={`${i}-${j}`} className="px-1 py-0.5 bg-gray-800 rounded text-blue-300 text-xs">{cp.slice(1, -1)}</code>;
+      }
+      return <span key={`${i}-${j}`}>{cp}</span>;
+    });
+  });
 }
