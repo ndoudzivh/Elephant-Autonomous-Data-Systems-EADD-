@@ -232,15 +232,14 @@ log_step "6/9" "Building & Deploying Lambda Function"
 # Install dependencies and build
 log_info "Installing Node.js dependencies..."
 cd packages/backend
-npm install --production 2>/dev/null || npm install 2>/dev/null || {
-  log_warn "npm install failed, trying with legacy peer deps..."
-  npm install --legacy-peer-deps 2>/dev/null || true
+npm install --production --legacy-peer-deps 2>/dev/null || npm install --legacy-peer-deps 2>/dev/null || {
+  log_warn "npm install had issues (non-blocking, continuing with existing modules)"
 }
 
 # Build TypeScript (if tsconfig exists)
 if [ -f "tsconfig.json" ]; then
   log_info "Compiling TypeScript..."
-  npx tsc --noEmit false --outDir dist 2>/dev/null || {
+  npx --yes tsc --noEmit false --outDir dist 2>/dev/null || {
     log_warn "TypeScript compilation had errors (non-blocking, using source directly)"
   }
 fi
