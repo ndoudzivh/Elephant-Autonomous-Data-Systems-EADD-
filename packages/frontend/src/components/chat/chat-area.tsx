@@ -65,13 +65,13 @@ export function ChatArea({ onToggleSidebar, onOpenArtifact }: ChatAreaProps) {
               />
             ))}
 
-            {/* Streaming message */}
-            {isStreaming && streamingContent && (
+            {/* Streaming message - show while streaming OR while content accumulates */}
+            {isStreaming && (
               <MessageBubble
                 message={{
                   id: 'streaming',
                   role: 'assistant',
-                  content: streamingContent,
+                  content: streamingContent || 'Thinking...',
                   status: 'streaming',
                   createdAt: new Date().toISOString(),
                 }}
