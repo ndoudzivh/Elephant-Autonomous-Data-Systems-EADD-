@@ -481,14 +481,23 @@ What would you like to build? 🐘`;
 // ==========================================
 // EADD Engine API (Structured Pipeline Generation)
 // ==========================================
-const engine = require('./engine');
+let engine;
+try {
+  engine = require('./engine');
+  console.log('[EADD] Engine loaded successfully');
+} catch (err) {
+  console.error('[EADD] Engine failed to load:', err.message);
+  engine = null;
+}
 
 app.post('/api/engine/generate', async (req, res) => {
+  if (!engine) return res.status(503).json({ error: 'Engine not loaded', hint: 'Check Lambda logs for require() errors' });
   const result = await engine.orchestrate(req.body);
   res.json(result);
 });
 
 app.post('/api/engine/validate', (req, res) => {
+  if (!engine) return res.status(503).json({ error: 'Engine not loaded' });
   const { code, language } = req.body;
   if (!code) return res.status(400).json({ error: 'code is required' });
   const result = engine.validateCode(code, language || 'python');
@@ -496,6 +505,7 @@ app.post('/api/engine/validate', (req, res) => {
 });
 
 app.post('/api/engine/test', (req, res) => {
+  if (!engine) return res.status(503).json({ error: 'Engine not loaded' });
   const { pipeline } = req.body;
   if (!pipeline) return res.status(400).json({ error: 'pipeline object is required' });
   const result = engine.testPipeline(pipeline);
@@ -503,6 +513,7 @@ app.post('/api/engine/test', (req, res) => {
 });
 
 app.post('/api/engine/schema/validate', (req, res) => {
+  if (!engine) return res.status(503).json({ error: 'Engine not loaded' });
   const { source_schema, target_schema } = req.body;
   if (!source_schema || !target_schema) return res.status(400).json({ error: 'source_schema and target_schema required' });
   const result = engine.validateSchemaCompatibility(source_schema, target_schema);
@@ -510,10 +521,12 @@ app.post('/api/engine/schema/validate', (req, res) => {
 });
 
 app.get('/api/engine/memory', (req, res) => {
+  if (!engine) return res.status(503).json({ error: 'Engine not loaded' });
   res.json(engine.getMemoryStats());
 });
 
 app.get('/api/engine/audit', (req, res) => {
+  if (!engine) return res.status(503).json({ error: 'Engine not loaded' });
   res.json({ log: engine.getAuditLog(50) });
 });
 

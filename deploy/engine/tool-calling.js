@@ -9,7 +9,8 @@
 
 'use strict';
 
-const AWS = require('@aws-sdk/client-s3');
+// AWS SDK clients (loaded lazily when needed)
+// const { S3Client } = require('@aws-sdk/client-s3'); // Enable when real S3 ops needed
 
 
 // Tool registry — what the agent can call
