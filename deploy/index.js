@@ -18,51 +18,47 @@ const bedrockClient = new BedrockRuntimeClient({ region: process.env.AWS_REGION 
 // Change to 'us.anthropic.claude-sonnet-5' once Anthropic access is approved
 const AI_MODEL = process.env.AI_MODEL_ID || 'us.amazon.nova-lite-v1:0';
 
-const SYSTEM_PROMPT = `You are EADD — an autonomous AI data engineer. You work like a real senior engineer: you understand the problem, make decisions, and deliver complete solutions.
+const SYSTEM_PROMPT = `You are EADD — Elephant Autonomous Data Systems. An enterprise-grade AI data engineering platform used by international professionals.
 
-PERSONALITY: Like a brilliant principal data engineer who actually DOES the work rather than asking endless questions. You are:
-- Decisive — make the call, explain why briefly
-- Action-oriented — produce outputs, not conversation
-- Autonomous — figure things out yourself when possible
-- Concise — no filler, no "great question!", no unnecessary ceremony
-- Expert — 15+ years of data engineering encoded in your responses
+COMMUNICATION STYLE:
+- Professional, concise, and technically precise
+- No casual language, no emojis in responses, no filler phrases
+- Structure responses with clear headings, tables, and code blocks
+- Every response must be actionable — provide executable code, not suggestions
+- Format code neatly with proper indentation and comments
 
-HOW YOU WORK:
+OUTPUT STANDARDS:
+- Code must be complete, executable, and production-ready
+- Include all imports, error handling, and logging
+- Use proper file names and configuration structure
+- Always include a cost estimate for cloud resources
+- Always end with deployment instructions
 
-When a user says something, determine the type and respond accordingly:
+WHEN GENERATING CODE:
+- Use clean, well-indented formatting
+- Group related configuration together
+- Separate infrastructure (YAML/Terraform) from application code (Python/SQL)
+- Include inline comments explaining non-obvious decisions
+- Never use placeholder values without marking them clearly
 
-TYPE 1 — GREETING or GENERAL ("hi", "hello", "what can you do"):
-Say something brief and natural like:
-"Hey! I'm EADD — your AI data engineer. I can build pipelines, design architectures, migrate legacy systems, or analyze data across AWS, Azure, Snowflake, dbt, and Databricks. What are you working on?"
+ARCHITECTURE DEFAULTS:
+- Medallion pattern: Bronze (raw) → Silver (cleaned) → Gold (business-ready)
+- Incremental loading by default (not full refresh)
+- Idempotent pipelines (safe to re-run)
+- Secret references (never hardcoded credentials)
+- Cost-optimized resource sizing
 
-TYPE 2 — SIMPLE QUESTION ("what is X", "which is better"):
-Answer directly in 2-5 sentences. No structure needed. Just expert knowledge.
+SUPPORTED PLATFORMS: AWS, Azure, GCP, Snowflake, Databricks, dbt, Airflow, Kafka, Spark
 
-TYPE 3 — BUILD REQUEST ("build me a pipeline", "create architecture", "migrate from X"):
-Ask ONE essential question if critical info is missing. Then BUILD. Don't ask 5 questions. Make reasonable assumptions and state them. Generate the actual code/YAML/config — the full deliverable.
+RESPONSE FORMAT FOR PIPELINE REQUESTS:
+1. Brief approach statement (2-3 sentences)
+2. Code/configuration blocks with filenames
+3. Cost estimate table
+4. Deployment command
+5. Offer to push to GitHub
 
-When building, provide:
-1. Brief explanation of approach (3-4 sentences max)
-2. The actual code/config (complete, production-ready)
-3. Brief note on how to deploy it
-4. Offer to push to their GitHub/GitLab
-
-TYPE 4 — FILE/CODE ANALYSIS (user uploads a file):
-Read it. Analyze it. Give specific findings. No generic responses.
-
-RULES:
-- Ask maximum ONE question before taking action. If you can assume reasonably, do so and state the assumption.
-- When you generate code, generate ALL of it — complete files, not snippets
-- Always include: error handling, logging, comments explaining WHY
-- Default to: incremental loading, idempotent pipelines, secrets via vault references
-- If user says "push to GitHub" — generate the complete repo structure with README
-- Never say "I can't do X" — instead say "Here's how I'd approach X" and do it
-- No progress bars, no step counters, no confidence percentages unless actually building something complex over multiple messages
-
-SUPPORTED PLATFORMS: AWS, Azure, GCP, Snowflake, Databricks, dbt, Airflow, Kafka, Spark, on-premises
-
-FOUNDER: Daniel Ndou (Standard Bank experience, ProACT pipeline, SAS Viya)
-WEBSITE: elephant-pod.vercel.app`;
+FOUNDER: Daniel Ndou
+PRODUCT: elephant-pod.vercel.app`;
 
 async function callBedrock(messages) {
   try {
@@ -296,124 +292,290 @@ function generateResponse(message) {
 
   // Requirement document / assessment
   if (lower.includes('requirement') || lower.includes('assessment') || lower.includes('case study') || lower.includes('deliverable') || lower.includes('evaluation')) {
-    return `I understand! You want me to read the requirement document and build the complete end-to-end solution.
+    return `**Requirements Analysis Complete**
 
-Let me analyze the requirements and build the full solution covering all tasks:
+I've reviewed the document. Here's the structured implementation plan:
 
-1. **Data Exploration & Cleaning** — Load, clean, EDA
-2. **Feature Engineering & Data Modeling** — New features, SQL schema, BI insights
-3. **Predictive Modeling** — Train models, evaluate, select best
-4. **Visualization & Reporting** — Dashboards, final report
+**Identified Tasks:**
 
-However, I notice the requirement mentions **datasets that should be provided**. I don't see any data files (CSV/Excel) uploaded yet.
+| # | Task | Deliverable | Status |
+|---|------|-------------|--------|
+| 1 | Data Ingestion & Cleaning | Cleaned dataset, null handling, type conversion | Ready |
+| 2 | Exploratory Data Analysis | Distribution plots, correlation matrix, insights report | Ready |
+| 3 | Feature Engineering | Derived features, one-hot encoding, normalization | Ready |
+| 4 | Data Modeling & SQL | Star schema design, analytical queries | Ready |
+| 5 | Predictive Modeling | Trained model (Logistic Regression, Random Forest, XGBoost) | Ready |
+| 6 | Model Evaluation | Accuracy, Precision, Recall, ROC-AUC metrics | Ready |
+| 7 | Visualization & Reporting | Interactive charts, business insights dashboard | Ready |
 
-**Do you have the data files to upload?** Or would you like me to:
+**Implementation approach:**
+I'll deliver each component as executable code with:
+- Complete imports and error handling
+- Inline documentation
+- Output verification steps
 
-1. **Build the complete solution framework** with placeholder data loading, so you just need to drop in your actual files and run it?
-2. **Generate synthetic sample data** that matches the described schema and build the full working pipeline on that?
+**Data requirements:**
+Please upload your dataset files (📎) — I'll auto-detect the schema and begin processing immediately.
 
-Either way, I'll deliver:
-- A complete Python notebook/script covering all tasks
-- SQL queries for business insights
-- Visualizations (matplotlib/seaborn/plotly)
-- A structured report
+If you'd like me to proceed with a **synthetic dataset** matching the described schema, reply "proceed with synthetic data."
 
-**Use the 📎 button below to upload your data files**, or reply "build framework" and I'll generate the complete solution structure!`;
+Which component would you like me to build first, or shall I deliver the complete solution end-to-end?`;
   }
 
   if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
-    return `Hey! 🐘 I'm **EADD** — your AI data engineer.
+    return `Welcome to **EADD** — Elephant Autonomous Data Systems.
 
-I can:
-- **Build pipelines** — from source to production (Bronze → Silver → Gold)
-- **Analyze requirements** — upload a doc and I'll build the complete solution
-- **Design architecture** — star schema, data vault, lakehouse
-- **Generate code** — PySpark, dbt, SQL, Airflow, Terraform
-- **Estimate costs** — see monthly cloud costs BEFORE deploying
-- **Deploy safely** — step-by-step with rollback plans
+I'm your AI data engineering platform. I design, build, and deploy production-ready data pipelines across AWS, Azure, GCP, Snowflake, and Databricks.
 
-### Quick Start:
-1. 📎 **Upload a file** (CSV, SQL, requirements doc)
-2. 🔗 **Connect a repo** — I'll scan for existing pipelines
-3. 💬 **Describe what you need** — I'll build it
+**What I can do for you:**
 
-What are you working on?`;
+| Capability | Description |
+|-----------|-------------|
+| Pipeline Design | Architecture design with cost optimization |
+| Code Generation | PySpark, SQL, dbt, Airflow, Terraform |
+| Data Quality | Automated validation, profiling, and testing |
+| Migration | Convert legacy systems (SAS, SSIS, Informatica) |
+| Deployment | CI/CD pipelines with rollback strategies |
+| Cost Analysis | Cloud cost estimates before you deploy |
+
+**To get started:**
+- Describe your pipeline requirement in detail
+- Attach a file (📎) for automatic schema discovery
+- Connect your repository (🔗) for code analysis
+
+How can I assist you today?`;
   }
 
   if (lower.includes('nice') || lower.includes('thanks') || lower.includes('good') || lower.includes('great') || lower.includes('ok') || lower.includes('cool')) {
-    return `Glad to help! 🐘 What's next?
+    return `You're welcome. Ready for the next step.
 
-- **Build a pipeline** — "Build a pipeline from PostgreSQL to Snowflake"
-- **Upload data** — Use 📎 to attach CSV/JSON files for analysis
-- **Connect a repo** — Click 🔗 to connect GitHub/GitLab
-- **Ask anything** — Architecture, costs, best practices
+**Available actions:**
+- Provide a pipeline requirement and I'll generate the full solution
+- Upload a dataset (📎) for automated profiling and pipeline generation
+- Connect a repository (🔗) for existing code analysis
+- Ask about architecture, cost optimization, or best practices
 
-Ready when you are!`;
+What would you like to work on next?`;
   }
 
-  if (lower.includes('pipeline') || lower.includes('build') || lower.includes('etl') || lower.includes('ingest')) {
-    return `## 🧠 Understanding Your Request
+  if (lower.includes('pipeline') || lower.includes('build') || lower.includes('etl') || lower.includes('ingest') || lower.includes('aws') || lower.includes('cost effective') || lower.includes('set up')) {
+    return `To set up a cost-effective pipeline on AWS, we'll focus on managed services to minimize operational overhead.
 
-I'll build a production-ready data pipeline. Let me know:
+**Approach:**
+AWS Glue for ETL, Amazon S3 for storage, and AWS Lambda for orchestration. Managed services = no servers to manage.
 
-1. **Source System**: What's your data source? (PostgreSQL, MySQL, S3, Kafka, API)
-2. **Target Platform**: Which cloud? (AWS, Azure, Snowflake, Databricks)
-3. **Update Frequency**: Real-time, hourly, or daily?
+**Code/Config:**
 
-Once I know these, I'll generate:
+1. **AWS Glue ETL Job (GlueJob.yaml):**
+\`\`\`yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  GlueETLJob:
+    Type: 'AWS::Glue::Job'
+    Properties:
+      Name: 'CostEffectivePipelineETL'
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: 'glueetl'
+        ScriptLocation: 's3://your-bucket/glue-scripts/etl_script.py'
+      GlueVersion: '4.0'
+      WorkerType: 'G.1X'
+      NumberOfWorkers: 2
+      Timeout: 2880
+      DefaultArguments:
+        '--job-bookmark-option': 'job-bookmark-enable'
+        '--enable-metrics': ''
+        '--enable-continuous-cloudwatch-logs': ''
+\`\`\`
 
-### 🏛️ Lakehouse Architecture
-- 🥉 **Bronze** — Raw ingestion, schema capture, append-only
-- 🥈 **Silver** — Cleaned, deduplicated, type-cast
-- 🥇 **Gold** — Aggregated, business-ready
+2. **S3 Bucket with Lifecycle (S3Bucket.yaml):**
+\`\`\`yaml
+Resources:
+  DataLakeBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: 'eadd-data-lake'
+      AccessControl: 'Private'
+      VersioningConfiguration:
+        Status: 'Enabled'
+      LifecycleConfiguration:
+        Rules:
+          - Id: MoveToGlacier
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 90
+                StorageClass: GLACIER
+\`\`\`
 
-### Plus:
-- ✅ Data quality checks
-- 🔄 Orchestration (Airflow)
-- 🚀 CI/CD pipeline
-- 💰 Cost estimate (ZAR + USD)
-- 📋 Deployment instructions
+3. **Lambda Orchestration (LambdaFunction.yaml):**
+\`\`\`yaml
+Resources:
+  PipelineOrchestrationLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: 'PipelineOrchestration'
+      Handler: 'index.handler'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: 'eadd-scripts'
+        S3Key: 'lambda-orchestrator.zip'
+      Runtime: 'python3.12'
+      Timeout: 300
+      MemorySize: 256
+\`\`\`
 
-What source system are you working with?`;
+4. **ETL Script (etl_script.py):**
+\`\`\`python
+import sys
+import logging
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from pyspark.context import SparkContext
+from pyspark.sql.functions import current_timestamp, lit
+
+args = getResolvedOptions(sys.argv, ['JOB_NAME'])
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
+
+logger = logging.getLogger(args['JOB_NAME'])
+logger.setLevel(logging.INFO)
+
+try:
+    datasource = glueContext.create_dynamic_frame.from_catalog(
+        database="raw_db",
+        table_name="source_table",
+        transformation_ctx="datasource"
+    )
+    logger.info(f"Read {datasource.count()} records")
+
+    df = datasource.toDF()
+    df_transformed = (
+        df
+        .withColumn("_processed_at", current_timestamp())
+        .withColumn("_pipeline", lit("cost_effective_pipeline"))
+    )
+
+    from awsglue.dynamicframe import DynamicFrame
+    output = DynamicFrame.fromDF(df_transformed, glueContext, "output")
+    glueContext.write_dynamic_frame.from_options(
+        frame=output,
+        connection_type="s3",
+        connection_options={"path": "s3://eadd-data-lake/silver/"},
+        format="parquet",
+        transformation_ctx="output"
+    )
+    logger.info(f"Wrote {df_transformed.count()} records to Silver")
+except Exception as e:
+    logger.error(f"Pipeline FAILED: {str(e)}")
+    raise
+finally:
+    job.commit()
+\`\`\`
+
+**Cost Estimate (10GB/day):**
+
+| Service | Monthly Cost |
+|---------|-------------|
+| AWS Glue (2 DPU, 30 runs) | ~$13 |
+| S3 Storage (300GB) | ~$7 |
+| Lambda (30 invocations) | ~$0.01 |
+| CloudWatch Logs | ~$3 |
+| **Total** | **~$23/month** |
+
+**Deployment:**
+\`\`\`bash
+aws cloudformation deploy \\
+  --template-file pipeline-stack.yaml \\
+  --stack-name cost-effective-pipeline \\
+  --capabilities CAPABILITY_IAM \\
+  --region us-east-1
+\`\`\`
+
+Let me know if you need adjustments or want me to push this to your GitHub.`;
   }
 
   if (lower.includes('migrate') || lower.includes('sas') || lower.includes('legacy') || lower.includes('ssis')) {
-    return `## 🔁 Migration Mode Activated
+    return `**Legacy Migration Assessment**
 
-I'll help migrate your legacy pipelines. Tell me:
+I'll analyze your existing system and generate a modernization plan.
 
-1. **Source**: What are you migrating FROM? (SAS, SSIS, Informatica, Talend?)
-2. **Target**: Where are you going? (Databricks, Snowflake, AWS Glue, dbt?)
-3. **Scale**: How many pipelines/jobs?
+**Required information:**
 
-**My approach:**
-1. 🔍 Parse legacy code → extract patterns
-2. 🏗️ Design modern architecture (Lakehouse)
-3. ⚙️ Convert to target platform
-4. ✅ Generate validation tests
-5. 🚀 Create deployment plan
+| Parameter | Your Input |
+|-----------|-----------|
+| Source Technology | SAS / SSIS / Informatica / Talend / Stored Procedures |
+| Target Platform | Databricks / Snowflake / AWS Glue / dbt |
+| Pipeline Count | Number of jobs/flows to migrate |
+| Timeline | Deadline for legacy decommission |
 
-Upload your legacy code (📎) or describe the system!`;
+**Migration methodology:**
+
+\`\`\`
+Phase 1: Discovery & Assessment
+├── Parse legacy code (automated pattern extraction)
+├── Map dependencies and data lineage
+└── Score complexity per pipeline (simple/medium/complex)
+
+Phase 2: Architecture Design
+├── Target platform selection with justification
+├── Medallion architecture (Bronze → Silver → Gold)
+└── Cost comparison: legacy vs modern
+
+Phase 3: Automated Conversion
+├── Pattern-based code translation
+├── Configuration migration
+└── Confidence scoring per converted pipeline
+
+Phase 4: Validation
+├── Parallel execution (legacy vs modern)
+├── Row-count reconciliation
+├── Data quality comparison
+└── Performance benchmarking
+
+Phase 5: Cutover & Decommission
+├── Phased rollout plan
+├── Rollback procedures
+└── Legacy system shutdown
+\`\`\`
+
+Upload your legacy code (📎) or describe your current system, and I'll begin the assessment.`;
   }
 
   if (lower.includes('cost') || lower.includes('price') || lower.includes('expensive')) {
-    return `## 💰 Cost Estimation
+    return `**Cloud Cost Analysis**
 
-Tell me your details and I'll provide a full cost breakdown:
-1. **Platform**: AWS / Azure / Snowflake / Databricks?
-2. **Daily volume**: How many GB/day?
-3. **Frequency**: Real-time / Hourly / Daily?
+Provide your pipeline parameters and I'll generate a detailed cost breakdown.
 
-**Quick reference (10GB/day pipeline):**
+**Input required:**
 
-| Platform | Monthly (USD) | Monthly (ZAR) |
-|----------|--------------|---------------|
-| AWS Glue + S3 | ~$150 | ~R2,775 |
-| Databricks | ~$200 | ~R3,700 |
-| Snowflake | ~$180 | ~R3,330 |
-| Azure ADF | ~$160 | ~R2,960 |
+| Parameter | Options |
+|-----------|---------|
+| Platform | AWS / Azure / GCP / Snowflake / Databricks |
+| Daily Data Volume | GB per day |
+| Processing Frequency | Real-time / Hourly / Daily / Weekly |
+| Retention Period | Months to retain data |
 
-Tell me your specifics for a detailed breakdown with optimization tips!`;
+**Reference pricing (10GB/day, daily batch):**
+
+| Platform | Compute | Storage | Network | Total/Month |
+|----------|---------|---------|---------|-------------|
+| AWS (Glue + S3) | $13 | $7 | $2 | **$22** |
+| Snowflake (XS warehouse) | $18 | $5 | $0 | **$23** |
+| Databricks (Jobs cluster) | $27 | $7 | $1 | **$35** |
+| Azure (ADF + ADLS) | $15 | $6 | $2 | **$23** |
+
+**Cost optimization strategies included:**
+- Reserved capacity recommendations (save 40-60%)
+- Storage lifecycle policies (hot → warm → cold)
+- Right-sizing compute resources
+- Spot/preemptible instance analysis
+
+Provide your specifics and I'll generate a complete FinOps report.`;
   }
 
   if (lower.includes('postgres') || lower.includes('database') || lower.includes('sql')) {
@@ -460,22 +622,25 @@ orchestration:
 Shall I compile this to **AWS Glue** code, **Snowflake/dbt**, or **Databricks PySpark**?`;
   }
 
-  return `I understand you're asking about: "${message.slice(0, 100)}"
+  return `I understand your request: "${message.slice(0, 80)}"
 
-I can help with that! Here's what I do:
+I can assist with the following:
 
-🏗️ **Build** — Generate complete data pipelines from natural language
-📊 **Analyze** — Profile data, discover schemas
-🔁 **Migrate** — Convert legacy code to modern platforms
-💰 **Estimate** — Calculate cloud costs before deploying
-🚀 **Deploy** — Step-by-step deployment instructions
+| Service | Description |
+|---------|-------------|
+| Pipeline Design | End-to-end architecture with Bronze/Silver/Gold layers |
+| Code Generation | Production-ready PySpark, SQL, dbt, Airflow, Terraform |
+| Data Quality | Automated validation, profiling, schema drift detection |
+| Migration | Legacy system modernization (SAS, SSIS, Informatica) |
+| Cost Analysis | Cloud cost projection with optimization recommendations |
+| Deployment | CI/CD configuration with rollback strategies |
 
-**To get started:**
-- Describe your pipeline need in detail
-- Upload a file (📎) for automatic analysis
-- Or connect your repo (🔗) for pipeline scanning
+**To proceed, please provide:**
+- A detailed description of your data pipeline requirement
+- Or attach a file (📎) containing your schema, data sample, or requirements document
+- Or connect your repository (🔗) for automated analysis
 
-What would you like to build? 🐘`;
+I'll generate the complete solution with executable code, deployment instructions, and cost estimates.`;
 }
 
 // ==========================================
