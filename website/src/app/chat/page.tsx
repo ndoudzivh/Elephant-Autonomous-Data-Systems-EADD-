@@ -368,49 +368,47 @@ export default function ChatPage() {
                 </button>
               </div>
 
-              {/* Toolbar row — Kiro style */}
-              <div className="flex items-center justify-between mt-2 px-1">
-                {/* Left: Action buttons (green/highlighted) */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1 px-2 py-1 text-green-400 hover:bg-green-400/10 rounded-md transition text-xs"
-                    title="Upload file"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/></svg>
-                  </button>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1 px-2 py-1 text-green-400 hover:bg-green-400/10 rounded-md transition text-xs"
-                    title="Attach file (CSV, SQL, YAML, requirements doc)"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13"/></svg>
-                  </button>
-                  <button
-                    onClick={() => setShowRepoModal(true)}
-                    className="flex items-center gap-1.5 px-2 py-1 text-green-400 hover:bg-green-400/10 rounded-md transition text-xs"
-                    title="Connect GitHub/GitLab repo"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
-                    <span>{connectedRepo ? connectedRepo.split('/').pop() : 'Select repo'}</span>
-                  </button>
-                </div>
+              {/* Toolbar row — Kiro style: globe, paperclip, select repo, connected repo chip */}
+              <div className="flex items-center gap-2 mt-2 px-1">
+                {/* Globe icon (web search / context) */}
+                <button
+                  className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition"
+                  title="Web context"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/></svg>
+                </button>
 
-                {/* Right: Model + Mode */}
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-500">Nova Lite</span>
-                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                    <span>🤖</span>
-                    <span>Autonomous</span>
-                    <div className="w-8 h-4 bg-gray-700 rounded-full relative cursor-pointer">
-                      <div className="w-3 h-3 bg-blue-500 rounded-full absolute top-0.5 right-0.5"></div>
-                    </div>
+                {/* Paperclip icon (attach file) */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition"
+                  title="Attach file (CSV, SQL, YAML, requirements doc, image)"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13"/></svg>
+                </button>
+
+                {/* Select repo button */}
+                <button
+                  onClick={() => setShowRepoModal(true)}
+                  className="flex items-center gap-1.5 px-2 py-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition text-xs"
+                  title="Connect GitHub/GitLab repo"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                  <span>Select repo</span>
+                </button>
+
+                {/* Connected repo chip (shows when repo is connected) */}
+                {connectedRepo && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-800 border border-gray-600 rounded-full text-xs text-gray-300">
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    <span className="max-w-[160px] truncate">{connectedRepo}</span>
+                    <button onClick={() => setConnectedRepo('')} className="text-gray-500 hover:text-red-400 ml-0.5">×</button>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Hidden file inputs */}
-              <input ref={fileInputRef} type="file" className="hidden" accept=".csv,.json,.yaml,.yml,.sql,.py,.sas,.dtsx,.xml,.parquet,.txt,.md,.pdf,.doc,.docx" multiple onChange={(e) => handleFileUpload(e, 'file')} />
+              <input ref={fileInputRef} type="file" className="hidden" accept=".csv,.json,.yaml,.yml,.sql,.py,.sas,.dtsx,.xml,.parquet,.txt,.md,.pdf,.doc,.docx,.png,.jpg,.jpeg,.gif,.webp" multiple onChange={(e) => handleFileUpload(e, 'file')} />
               <input ref={imageInputRef} type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'image')} />
             </div>
 
@@ -422,14 +420,14 @@ export default function ChatPage() {
                   <p className="text-sm text-gray-400 mb-4">Connect a GitHub or GitLab repo so EADD can analyze your existing code and pipelines.</p>
                   <input
                     type="text"
-                    placeholder="https://github.com/username/repo"
+                    placeholder="ndoudzivh/Elephant-Autonomous-Data-Systems-EADD-"
+                    defaultValue="ndoudzivh/Elephant-Autonomous-Data-Systems-EADD-"
                     className="w-full px-4 py-3 bg-[#0a1628] border border-gray-600 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500 mb-3"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         const val = (e.target as HTMLInputElement).value;
                         if (val) {
                           setConnectedRepo(val);
-                          setAttachedFiles(prev => [...prev, { name: val.split('/').slice(-1)[0], type: 'repo' }]);
                           setShowRepoModal(false);
                         }
                       }
@@ -439,12 +437,10 @@ export default function ChatPage() {
                     <button onClick={() => setShowRepoModal(false)} className="flex-1 px-4 py-2 border border-gray-600 rounded-lg text-sm hover:bg-gray-800 transition">Cancel</button>
                     <button
                       onClick={() => {
-                        const input = document.querySelector<HTMLInputElement>('[placeholder*="github"]');
-                        if (input?.value) {
-                          setConnectedRepo(input.value);
-                          setAttachedFiles(prev => [...prev, { name: input.value.split('/').slice(-1)[0], type: 'repo' }]);
-                          setShowRepoModal(false);
-                        }
+                        const input = document.querySelector<HTMLInputElement>('[placeholder*="ndoudzivh"]');
+                        const val = input?.value || 'ndoudzivh/Elephant-Autonomous-Data-Systems-EADD-';
+                        setConnectedRepo(val);
+                        setShowRepoModal(false);
                       }}
                       className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm transition"
                     >Connect</button>
