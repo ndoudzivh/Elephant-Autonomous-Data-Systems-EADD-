@@ -479,6 +479,45 @@ What would you like to build? 🐘`;
 }
 
 // ==========================================
+// EADD Engine API (Structured Pipeline Generation)
+// ==========================================
+const engine = require('./engine');
+
+app.post('/api/engine/generate', async (req, res) => {
+  const result = await engine.orchestrate(req.body);
+  res.json(result);
+});
+
+app.post('/api/engine/validate', (req, res) => {
+  const { code, language } = req.body;
+  if (!code) return res.status(400).json({ error: 'code is required' });
+  const result = engine.validateCode(code, language || 'python');
+  res.json(result);
+});
+
+app.post('/api/engine/test', (req, res) => {
+  const { pipeline } = req.body;
+  if (!pipeline) return res.status(400).json({ error: 'pipeline object is required' });
+  const result = engine.testPipeline(pipeline);
+  res.json(result);
+});
+
+app.post('/api/engine/schema/validate', (req, res) => {
+  const { source_schema, target_schema } = req.body;
+  if (!source_schema || !target_schema) return res.status(400).json({ error: 'source_schema and target_schema required' });
+  const result = engine.validateSchemaCompatibility(source_schema, target_schema);
+  res.json(result);
+});
+
+app.get('/api/engine/memory', (req, res) => {
+  res.json(engine.getMemoryStats());
+});
+
+app.get('/api/engine/audit', (req, res) => {
+  res.json({ log: engine.getAuditLog(50) });
+});
+
+// ==========================================
 // Lambda Handler + Local Server
 // ==========================================
 if (process.env.AWS_LAMBDA_FUNCTION_NAME) {
