@@ -89,80 +89,49 @@ export default function ChatPage() {
     }
 
     try {
-      // Try JSON endpoint first, fall back to SSE endpoint
+      // Use /api/agent/chat - the endpoint API Gateway routes to Lambda
       let content = '';
       
-      try {
-        const res = await fetch(`${API_URL}/api/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: fullMessage,
-            conversation_id: conversation_id || 'chat-1',
-            history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
-          }),
-        });
+      const res = await fetch(`${API_URL}/api/agent/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: fullMessage,
+          conversation_id: conversation_id || 'chat-1',
+          history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
+        }),
+      });
 
-        if (res.ok) {
-          const contentType = res.headers.get('content-type') || '';
-          if (contentType.includes('application/json')) {
-            const data = await res.json();
-            content = data.content || '';
-          } else {
-            // SSE response - parse it
-            const text = await res.text();
-            const lines = text.split('\n');
-            for (const line of lines) {
-              if (line.startsWith('data: ') && !line.includes('[DONE]')) {
-                try {
-                  const event = JSON.parse(line.slice(6));
-                  if (event.type === 'content_delta') {
-                    content += event.content;
-                  }
-                } catch {}
-              }
-            }
-          }
-        }
-      } catch (e) {
-        // JSON endpoint failed, try SSE endpoint
-        console.log('JSON endpoint failed, trying SSE...', e);
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
       }
 
-      // Fallback: try /api/agent/chat if /api/chat didn't work
-      if (!content) {
-        try {
-          const res2 = await fetch(`${API_URL}/api/agent/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              message: fullMessage,
-              conversation_id: conversation_id || 'chat-1',
-              history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
-            }),
-          });
-
-          const text = await res2.text();
-          const lines = text.split('\n');
-          for (const line of lines) {
-            if (line.startsWith('data: ') && !line.includes('[DONE]')) {
-              try {
-                const event = JSON.parse(line.slice(6));
-                if (event.type === 'content_delta') {
-                  content += event.content;
-                }
-              } catch {}
-            }
+      // Parse the response - could be JSON or SSE format
+      const responseText = await res.text();
+      
+      // Try JSON first
+      try {
+        const json = JSON.parse(responseText);
+        content = json.content || '';
+      } catch {
+        // Not JSON - parse as SSE
+        const lines = responseText.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ') && !line.includes('[DONE]')) {
+            try {
+              const event = JSON.parse(line.slice(6));
+              if (event.type === 'content_delta') {
+                content += event.content;
+              }
+            } catch {}
           }
-        } catch (e2) {
-          console.error('Both endpoints failed', e2);
         }
       }
 
       setMessages(prev => [...prev, { 
         id: (Date.now() + 1).toString(), 
         role: 'assistant', 
-        content: content || 'No response received. Please check your connection and try again.' 
+        content: content || 'No response received. Please try again.' 
       }]);
     } catch (err: any) {
       console.error('Chat error:', err);
