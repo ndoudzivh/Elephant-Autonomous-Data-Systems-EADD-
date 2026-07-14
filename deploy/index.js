@@ -144,6 +144,62 @@ app.post('/api/conversations', (req, res) => {
 });
 
 // ==========================================
+// Simple JSON Chat (Works with API Gateway - NO SSE)
+// ==========================================
+app.post('/api/chat', async (req, res) => {
+  const { message, history, conversation_id } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ error: 'message is required' });
+  }
+
+  try {
+    let content = '';
+
+    // Try Bedrock AI
+    try {
+      const msgs = [];
+      if (history && Array.isArray(history)) {
+        for (const h of history.slice(-10)) {
+          msgs.push({ role: h.role === 'assistant' ? 'assistant' : 'user', content: [{ text: h.content }] });
+        }
+      }
+      msgs.push({ role: 'user', content: [{ text: message }] });
+
+      const command = new ConverseStreamCommand({
+        modelId: AI_MODEL,
+        system: [{ text: SYSTEM_PROMPT }],
+        messages: msgs,
+        inferenceConfig: { maxTokens: 2048, temperature: 0.3 },
+      });
+
+      const response = await bedrockClient.send(command);
+      for await (const event of response.stream) {
+        if (event.contentBlockDelta?.delta?.text) {
+          content += event.contentBlockDelta.delta.text;
+        }
+      }
+    } catch (bedrockErr) {
+      console.error('[Bedrock]', bedrockErr.message);
+      content = generateResponse(message);
+    }
+
+    res.json({
+      id: uuidv4(),
+      content,
+      model: AI_MODEL,
+    });
+  } catch (err) {
+    console.error('[Chat Error]', err.message);
+    res.json({
+      id: uuidv4(),
+      content: generateResponse(message),
+      model: 'template',
+    });
+  }
+});
+
+// ==========================================
 // Agent Chat (SSE Streaming - REAL AI via Bedrock)
 // ==========================================
 app.post('/api/agent/chat', async (req, res) => {

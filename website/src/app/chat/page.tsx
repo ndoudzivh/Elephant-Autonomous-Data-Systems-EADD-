@@ -35,6 +35,7 @@ export default function ChatPage() {
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [showRepoModal, setShowRepoModal] = useState(false);
   const [connectedRepo, setConnectedRepo] = useState('');
+  const [conversation_id] = useState('chat-' + Date.now());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -68,6 +69,7 @@ export default function ChatPage() {
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: msgText, attachments: attachedFiles.length > 0 ? [...attachedFiles] : undefined };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
+    const currentFiles = [...attachedFiles];
     setAttachedFiles([]);
     setLoading(true);
     setStreamingContent('');
@@ -75,50 +77,40 @@ export default function ChatPage() {
     // Auto-resize textarea back
     if (inputRef.current) inputRef.current.style.height = 'auto';
 
+    // Build the full message including file content
+    let fullMessage = msgText;
+    if (currentFiles.length > 0) {
+      fullMessage += `\n\n[Attached files: ${currentFiles.map(f => f.name).join(', ')}]`;
+      for (const f of currentFiles) {
+        if (f.content) {
+          fullMessage += `\n\n--- File: ${f.name} ---\n${f.content.slice(0, 8000)}`;
+        }
+      }
+    }
+
     try {
-      const res = await fetch(`${API_URL}/api/agent/chat`, {
+      // Use simple JSON endpoint (works with API Gateway)
+      const res = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: msgText + (userMsg.attachments?.length ? `\n\n[Attached files: ${userMsg.attachments.map(f => f.name).join(', ')}]${userMsg.attachments.filter(f => f.content).map(f => `\n\n--- File: ${f.name} ---\n${f.content?.slice(0, 5000)}`).join('')}` : ''),
-          conversation_id: 'chat-1',
-          history: messages.map(m => ({ role: m.role, content: m.content })),
+          message: fullMessage,
+          conversation_id: conversation_id || 'chat-1',
+          history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
         }),
       });
 
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error('No reader');
-
-      const decoder = new TextDecoder();
-      let fullContent = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6);
-          if (data === '[DONE]') continue;
-          try {
-            const event = JSON.parse(data);
-            if (event.type === 'content_delta') {
-              fullContent += event.content;
-              setStreamingContent(fullContent);
-            }
-          } catch {}
-        }
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
       }
 
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: fullContent || 'No response received. Please try again.' }]);
-      setStreamingContent('');
+      const data = await res.json();
+      const content = data.content || 'No response received.';
+
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content }]);
     } catch (err: any) {
       console.error('Chat error:', err);
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `Connection error: ${err.message || 'Unable to reach the server'}. Please try again.` }]);
-      setStreamingContent('');
     }
 
     setLoading(false);
