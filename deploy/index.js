@@ -724,13 +724,126 @@ app.get('/api/engine/audit', (req, res) => {
 });
 
 // ==========================================
-// Lambda Handler + Local Server
+// Lambda Handler — RAW (no serverless-http)
+// This is the v2 approach that WORKS with API Gateway
 // ==========================================
 if (process.env.AWS_LAMBDA_FUNCTION_NAME) {
-  // Running in Lambda
-  module.exports.handler = serverless(app);
+  // Running in Lambda — use raw handler (bypasses Express for /api/agent/chat)
+  module.exports.handler = async (event) => {
+    let body;
+    try { body = JSON.parse(event.body || '{}'); } catch { body = {}; }
+
+    const path = event.path || event.rawPath || '';
+    const method = event.httpMethod || event.requestContext?.http?.method || 'GET';
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+    };
+
+    // CORS preflight
+    if (method === 'OPTIONS') {
+      return { statusCode: 200, headers, body: '' };
+    }
+
+    // Health
+    if (path.includes('/health')) {
+      return { statusCode: 200, headers, body: JSON.stringify({ status: 'healthy', version: '2.0.0', product: 'EADD', timestamp: new Date().toISOString(), services: { api: 'up', ai: 'ready' } }) };
+    }
+
+    // Billing/Plans
+    if (path.includes('/billing/plans')) {
+      return { statusCode: 200, headers, body: JSON.stringify({ plans: [
+        { id: 'free', name: 'Free', price: 0, currency: 'ZAR', interval: 'forever', features: ['20 messages/day', '3 pipelines', 'AWS only'] },
+        { id: 'pro_monthly', name: 'Pro', price: 899, currency: 'ZAR', interval: 'monthly', features: ['500 messages/day', '50 pipelines', 'All clouds'] },
+        { id: 'team', name: 'Team', price: 699, currency: 'ZAR', interval: 'monthly', features: ['Pro + SSO', 'Shared workspaces'] },
+        { id: 'enterprise', name: 'Enterprise', price: 9000, currency: 'ZAR', interval: 'monthly', features: ['VPC', 'Unlimited', 'SLA'] },
+      ]}) };
+    }
+
+    // Agent capabilities
+    if (path.includes('/capabilities')) {
+      return { statusCode: 200, headers, body: JSON.stringify({ capabilities: [
+        { name: 'generate_pipeline', description: 'Generate data pipelines', requires_approval: false },
+        { name: 'discover_schema', description: 'Discover schemas', requires_approval: false },
+        { name: 'deploy_production', description: 'Deploy to production', requires_approval: true },
+      ], model: { provider: 'aws_bedrock', model_id: AI_MODEL } }) };
+    }
+
+    // Engine endpoints
+    if (path.includes('/engine/validate') && method === 'POST') {
+      if (!engine) return { statusCode: 503, headers, body: JSON.stringify({ error: 'Engine not loaded' }) };
+      const result = engine.validateCode(body.code || '', body.language || 'python');
+      return { statusCode: 200, headers, body: JSON.stringify(result) };
+    }
+    if (path.includes('/engine/generate') && method === 'POST') {
+      if (!engine) return { statusCode: 503, headers, body: JSON.stringify({ error: 'Engine not loaded' }) };
+      const result = await engine.orchestrate(body);
+      return { statusCode: 200, headers, body: JSON.stringify(result) };
+    }
+    if (path.includes('/engine/test') && method === 'POST') {
+      if (!engine) return { statusCode: 503, headers, body: JSON.stringify({ error: 'Engine not loaded' }) };
+      const result = engine.testPipeline(body.pipeline || body);
+      return { statusCode: 200, headers, body: JSON.stringify(result) };
+    }
+    if (path.includes('/engine/memory')) {
+      if (!engine) return { statusCode: 503, headers, body: JSON.stringify({ error: 'Engine not loaded' }) };
+      return { statusCode: 200, headers, body: JSON.stringify(engine.getMemoryStats()) };
+    }
+    if (path.includes('/engine/audit')) {
+      if (!engine) return { statusCode: 503, headers, body: JSON.stringify({ error: 'Engine not loaded' }) };
+      return { statusCode: 200, headers, body: JSON.stringify({ log: engine.getAuditLog(50) }) };
+    }
+
+    // Pipeline generate
+    if (path.includes('/pipelines/generate') && method === 'POST') {
+      const yaml = `name: ${body.name || 'my-pipeline'}\nversion: "1.0.0"\nsource:\n  type: ${body.source_type || 'postgres'}\ntarget:\n  cloud: ${body.target_cloud || 'aws'}`;
+      return { statusCode: 200, headers, body: JSON.stringify({ pipeline_yaml: yaml, status: 'generated' }) };
+    }
+
+    // Chat (both /api/chat and /api/agent/chat)
+    if (path.includes('/chat') && method === 'POST') {
+      const { message, history } = body;
+      if (!message) return { statusCode: 400, headers, body: JSON.stringify({ error: 'message is required' }) };
+
+      let content = '';
+      try {
+        const msgs = [];
+        if (history && Array.isArray(history)) {
+          for (const h of history.slice(-10)) {
+            msgs.push({ role: h.role === 'assistant' ? 'assistant' : 'user', content: [{ text: h.content }] });
+          }
+        }
+        msgs.push({ role: 'user', content: [{ text: message }] });
+
+        const command = new ConverseStreamCommand({
+          modelId: AI_MODEL,
+          system: [{ text: SYSTEM_PROMPT }],
+          messages: msgs,
+          inferenceConfig: { maxTokens: 2048, temperature: 0.3 },
+        });
+
+        const response = await bedrockClient.send(command);
+        for await (const event of response.stream) {
+          if (event.contentBlockDelta?.delta?.text) {
+            content += event.contentBlockDelta.delta.text;
+          }
+        }
+      } catch (err) {
+        console.error('[Bedrock]', err.message);
+        content = generateResponse(message);
+      }
+
+      return { statusCode: 200, headers, body: JSON.stringify({ id: Date.now().toString(36), content, model: AI_MODEL }) };
+    }
+
+    // Default 404
+    return { statusCode: 404, headers, body: JSON.stringify({ error: 'Not found', path }) };
+  };
 } else {
-  // Running locally
+  // Running locally — use Express
   const PORT = process.env.PORT || 4000;
   app.listen(PORT, () => {
     console.log(`EADD Backend running on http://localhost:${PORT}`);
