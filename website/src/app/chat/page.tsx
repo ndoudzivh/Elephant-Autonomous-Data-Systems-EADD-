@@ -279,6 +279,7 @@ export default function ChatPage() {
           </button>
           <span className="text-sm text-gray-400">EADD Agent</span>
           <span className="ml-2 text-xs text-green-400 bg-green-400/10 px-2 py-0.5 rounded-full">Nova Lite</span>
+          <span className="ml-auto text-[10px] text-gray-600">v2.1</span>
         </header>
 
         {/* Messages Area */}
