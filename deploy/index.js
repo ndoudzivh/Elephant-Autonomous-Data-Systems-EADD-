@@ -200,8 +200,7 @@ app.post('/api/chat', async (req, res) => {
 });
 
 // ==========================================
-// Agent Chat (SSE Streaming - REAL AI via Bedrock)
-// Also handles Lambda mode by returning buffered SSE
+// Agent Chat - Simple JSON response (works with API Gateway)
 // ==========================================
 app.post('/api/agent/chat', async (req, res) => {
   const { conversation_id, message, history } = req.body;
@@ -210,8 +209,6 @@ app.post('/api/agent/chat', async (req, res) => {
     return res.status(400).json({ error: 'message is required' });
   }
 
-  // In Lambda: return SSE-formatted text as a single response
-  // This works because serverless-http sends the full body at once
   try {
     let content = '';
 
@@ -242,20 +239,10 @@ app.post('/api/agent/chat', async (req, res) => {
       content = generateResponse(message);
     }
 
-    const messageId = uuidv4();
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    const body = `data: ${JSON.stringify({ type: 'message_start', message_id: messageId })}\n\ndata: ${JSON.stringify({ type: 'content_delta', content: content })}\n\ndata: ${JSON.stringify({ type: 'message_end', message_id: messageId })}\n\ndata: [DONE]\n\n`;
-    res.status(200).send(body);
+    res.status(200).json({ id: uuidv4(), content, model: AI_MODEL });
   } catch (err) {
     console.error('[Agent Chat Error]', err.message);
-    const fallback = generateResponse(message);
-    const messageId = uuidv4();
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    const body = `data: ${JSON.stringify({ type: 'message_start', message_id: messageId })}\n\ndata: ${JSON.stringify({ type: 'content_delta', content: fallback })}\n\ndata: ${JSON.stringify({ type: 'message_end', message_id: messageId })}\n\ndata: [DONE]\n\n`;
-    res.status(200).send(body);
+    res.status(200).json({ id: uuidv4(), content: generateResponse(message), model: 'template' });
   }
 });
 

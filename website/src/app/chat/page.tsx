@@ -89,9 +89,6 @@ export default function ChatPage() {
     }
 
     try {
-      // Use /api/agent/chat - the endpoint API Gateway routes to Lambda
-      let content = '';
-      
       const res = await fetch(`${API_URL}/api/agent/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -106,32 +103,13 @@ export default function ChatPage() {
         throw new Error(`Server returned ${res.status}`);
       }
 
-      // Parse the response - could be JSON or SSE format
-      const responseText = await res.text();
-      
-      // Try JSON first
-      try {
-        const json = JSON.parse(responseText);
-        content = json.content || '';
-      } catch {
-        // Not JSON - parse as SSE
-        const lines = responseText.split('\n');
-        for (const line of lines) {
-          if (line.startsWith('data: ') && !line.includes('[DONE]')) {
-            try {
-              const event = JSON.parse(line.slice(6));
-              if (event.type === 'content_delta') {
-                content += event.content;
-              }
-            } catch {}
-          }
-        }
-      }
+      const data = await res.json();
+      const content = data.content || 'No response received.';
 
       setMessages(prev => [...prev, { 
         id: (Date.now() + 1).toString(), 
         role: 'assistant', 
-        content: content || 'No response received. Please try again.' 
+        content 
       }]);
     } catch (err: any) {
       console.error('Chat error:', err);
