@@ -113,10 +113,11 @@ export default function ChatPage() {
         }
       }
 
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: fullContent }]);
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: fullContent || 'No response received. Please try again.' }]);
       setStreamingContent('');
-    } catch {
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: 'Sorry, something went wrong. Please try again.' }]);
+    } catch (err: any) {
+      console.error('Chat error:', err);
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `Connection error: ${err.message || 'Unable to reach the server'}. Please try again.` }]);
       setStreamingContent('');
     }
 
@@ -136,12 +137,17 @@ export default function ChatPage() {
 
     Array.from(files).forEach(file => {
       const reader = new FileReader();
+      
+      // Determine if file is text-readable
+      const textExtensions = ['.csv', '.json', '.yaml', '.yml', '.sql', '.py', '.txt', '.md', '.sas', '.xml', '.dtsx'];
+      const isTextFile = textExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+
       reader.onload = () => {
         const newFile: AttachedFile = {
           name: file.name,
-          type: fileType,
+          type: fileType === 'image' ? 'image' : 'file',
           size: file.size,
-          content: fileType === 'file' ? reader.result as string : undefined,
+          content: isTextFile ? (reader.result as string) : `[Binary file: ${file.name}, ${(file.size / 1024).toFixed(1)}KB]`,
           preview: fileType === 'image' ? reader.result as string : undefined,
         };
         setAttachedFiles(prev => [...prev, newFile]);
@@ -149,8 +155,17 @@ export default function ChatPage() {
 
       if (fileType === 'image') {
         reader.readAsDataURL(file);
-      } else {
+      } else if (isTextFile) {
         reader.readAsText(file);
+      } else {
+        // For binary files (PDF, DOC, etc.), just record the name
+        const newFile: AttachedFile = {
+          name: file.name,
+          type: 'file',
+          size: file.size,
+          content: `[Uploaded file: ${file.name}, ${(file.size / 1024).toFixed(1)}KB - Please describe the contents or paste the text]`,
+        };
+        setAttachedFiles(prev => [...prev, newFile]);
       }
     });
 
