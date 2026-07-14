@@ -60,8 +60,88 @@ exports.handler = async (event) => {
         version: '2.0.0',
         product: 'EADD - Elephant Autonomous Data Systems',
         timestamp: new Date().toISOString(),
+        capabilities: ['code_generation', 'code_validation', 'auto_fix', 'schema_intelligence', 'tool_calling', 'pipeline_testing', 'security_gate', 'memory', 'orchestration', 'output_standardization'],
       }),
     };
+  }
+
+  // ============================================================
+  // ENGINE API — Core Capabilities (10 modules)
+  // ============================================================
+
+  // POST /api/engine/generate — Full orchestration pipeline
+  if (path.includes('/engine/generate') && method === 'POST') {
+    try {
+      const engine = require('./engine');
+      const result = await engine.orchestrate(body);
+      return { statusCode: 200, headers, body: JSON.stringify(result) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
+  // POST /api/engine/validate — Code validation
+  if (path.includes('/engine/validate') && method === 'POST') {
+    try {
+      const engine = require('./engine');
+      const result = engine.validateCode(body.code || '', body.language || 'python');
+      return { statusCode: 200, headers, body: JSON.stringify(result) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
+  // POST /api/engine/fix — Auto-fix loop
+  if (path.includes('/engine/fix') && method === 'POST') {
+    try {
+      const engine = require('./engine');
+      const result = engine.autoFixLoop(body.code || '', body.language || 'python');
+      return { statusCode: 200, headers, body: JSON.stringify(result) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
+  // POST /api/engine/schema/validate — Schema compatibility
+  if (path.includes('/engine/schema') && method === 'POST') {
+    try {
+      const engine = require('./engine');
+      const result = engine.validateSchemaCompatibility(body.source_schema, body.target_schema);
+      return { statusCode: 200, headers, body: JSON.stringify(result) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
+  // POST /api/engine/test — Pipeline testing
+  if (path.includes('/engine/test') && method === 'POST') {
+    try {
+      const engine = require('./engine');
+      const result = engine.testPipeline(body.pipeline || body);
+      return { statusCode: 200, headers, body: JSON.stringify(result) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
+  // GET /api/engine/memory — Memory stats
+  if (path.includes('/engine/memory')) {
+    try {
+      const engine = require('./engine');
+      return { statusCode: 200, headers, body: JSON.stringify(engine.getMemoryStats()) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
+  // GET /api/engine/audit — Security audit trail
+  if (path.includes('/engine/audit')) {
+    try {
+      const engine = require('./engine');
+      return { statusCode: 200, headers, body: JSON.stringify({ log: engine.getAuditLog(50) }) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
   }
 
   // Route: POST /api/agent/chat OR /api/chat
