@@ -201,6 +201,7 @@ app.post('/api/chat', async (req, res) => {
 
 // ==========================================
 // Agent Chat (SSE Streaming - REAL AI via Bedrock)
+// Also handles Lambda mode by returning buffered SSE
 // ==========================================
 app.post('/api/agent/chat', async (req, res) => {
   const { conversation_id, message, history } = req.body;
@@ -209,137 +210,53 @@ app.post('/api/agent/chat', async (req, res) => {
     return res.status(400).json({ error: 'message is required' });
   }
 
-  const messageId = uuidv4();
-  const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
-
-  // In Lambda: API Gateway doesn't support SSE properly
-  // Return a single JSON response with the full content
-  if (isLambda) {
-    try {
-      let fullContent = '';
-
-      // Try Bedrock first
-      try {
-        const messages = [];
-        if (history && Array.isArray(history)) {
-          for (const h of history.slice(-10)) {
-            messages.push({ role: h.role, content: h.content });
-          }
-        }
-        messages.push({ role: 'user', content: message });
-
-        const bedrockMessages = messages.map(m => ({
-          role: m.role === 'assistant' ? 'assistant' : 'user',
-          content: [{ text: m.content }],
-        }));
-
-        const command = new ConverseStreamCommand({
-          modelId: AI_MODEL,
-          system: [{ text: SYSTEM_PROMPT }],
-          messages: bedrockMessages,
-          inferenceConfig: { maxTokens: 2048, temperature: 0.3 },
-        });
-
-        const bedrockResponse = await bedrockClient.send(command);
-        for await (const event of bedrockResponse.stream) {
-          if (event.contentBlockDelta?.delta?.text) {
-            fullContent += event.contentBlockDelta.delta.text;
-          }
-        }
-      } catch (bedrockErr) {
-        console.error('[Bedrock Error]', bedrockErr.message);
-        // Fallback to templates
-        fullContent = generateResponse(message);
-      }
-
-      // Return as SSE-formatted response (what frontend expects)
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      const events = [
-        `data: ${JSON.stringify({ type: 'message_start', message_id: messageId })}\n\n`,
-        `data: ${JSON.stringify({ type: 'content_delta', content: fullContent })}\n\n`,
-        `data: ${JSON.stringify({ type: 'message_end', message_id: messageId, usage: { total_tokens: 0, model: AI_MODEL } })}\n\n`,
-        `data: [DONE]\n\n`,
-      ].join('');
-      res.send(events);
-      return;
-    } catch (err) {
-      console.error('[Lambda Chat Error]', err.message);
-      const fallback = generateResponse(message);
-      res.setHeader('Content-Type', 'text/event-stream');
-      const events = [
-        `data: ${JSON.stringify({ type: 'message_start', message_id: messageId })}\n\n`,
-        `data: ${JSON.stringify({ type: 'content_delta', content: fallback })}\n\n`,
-        `data: ${JSON.stringify({ type: 'message_end', message_id: messageId })}\n\n`,
-        `data: [DONE]\n\n`,
-      ].join('');
-      res.send(events);
-      return;
-    }
-  }
-
-  // Non-Lambda (local dev): Use real SSE streaming
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-
-  res.write(`data: ${JSON.stringify({ type: 'message_start', message_id: messageId })}\n\n`);
-
+  // In Lambda: return SSE-formatted text as a single response
+  // This works because serverless-http sends the full body at once
   try {
-    // Build message history for context
-    const messages = [];
-    if (history && Array.isArray(history)) {
-      for (const h of history.slice(-10)) { // last 10 messages for context
-        messages.push({ role: h.role, content: h.content });
+    let content = '';
+
+    try {
+      const msgs = [];
+      if (history && Array.isArray(history)) {
+        for (const h of history.slice(-10)) {
+          msgs.push({ role: h.role === 'assistant' ? 'assistant' : 'user', content: [{ text: h.content }] });
+        }
       }
-    }
-    messages.push({ role: 'user', content: message });
+      msgs.push({ role: 'user', content: [{ text: message }] });
 
-    // Call REAL Bedrock AI (Nova Lite)
-    const bedrockMessages = messages.map(m => ({
-      role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: [{ text: m.content }],
-    }));
+      const command = new ConverseStreamCommand({
+        modelId: AI_MODEL,
+        system: [{ text: SYSTEM_PROMPT }],
+        messages: msgs,
+        inferenceConfig: { maxTokens: 2048, temperature: 0.3 },
+      });
 
-    const command = new ConverseStreamCommand({
-      modelId: AI_MODEL,
-      system: [{ text: SYSTEM_PROMPT }],
-      messages: bedrockMessages,
-      inferenceConfig: { maxTokens: 2048, temperature: 0.3 },
-    });
-
-    const bedrockResponse = await bedrockClient.send(command);
-    let totalTokens = 0;
-
-    for await (const event of bedrockResponse.stream) {
-      if (event.contentBlockDelta?.delta?.text) {
-        const chunk = event.contentBlockDelta.delta.text;
-        res.write(`data: ${JSON.stringify({ type: 'content_delta', content: chunk })}\n\n`);
+      const response = await bedrockClient.send(command);
+      for await (const event of response.stream) {
+        if (event.contentBlockDelta?.delta?.text) {
+          content += event.contentBlockDelta.delta.text;
+        }
       }
-      if (event.metadata?.usage) {
-        totalTokens = event.metadata.usage.totalTokens || 0;
-      }
+    } catch (bedrockErr) {
+      console.error('[Bedrock]', bedrockErr.message);
+      content = generateResponse(message);
     }
 
-    res.write(`data: ${JSON.stringify({ type: 'message_end', message_id: messageId, usage: { total_tokens: totalTokens, model: AI_MODEL, estimated_cost_usd: (totalTokens / 1000000) * 0.06 } })}\n\n`);
-
-  } catch (error) {
-    console.error('[Chat Error]', error.message, error.name);
-    
-    // Graceful fallback — use rich template responses instead of showing error
+    const messageId = uuidv4();
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const body = `data: ${JSON.stringify({ type: 'message_start', message_id: messageId })}\n\ndata: ${JSON.stringify({ type: 'content_delta', content: content })}\n\ndata: ${JSON.stringify({ type: 'message_end', message_id: messageId })}\n\ndata: [DONE]\n\n`;
+    res.status(200).send(body);
+  } catch (err) {
+    console.error('[Agent Chat Error]', err.message);
     const fallback = generateResponse(message);
-    
-    // Stream the fallback in chunks (feels more natural)
-    const chunks = fallback.match(/.{1,8}/g) || [fallback];
-    for (const chunk of chunks) {
-      res.write(`data: ${JSON.stringify({ type: 'content_delta', content: chunk })}\n\n`);
-    }
-    
-    res.write(`data: ${JSON.stringify({ type: 'message_end', message_id: messageId, usage: { total_tokens: 0, model: 'template-fallback', note: 'AI engine temporarily using templates. Enable Bedrock model access for full AI responses.' } })}\n\n`);
+    const messageId = uuidv4();
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const body = `data: ${JSON.stringify({ type: 'message_start', message_id: messageId })}\n\ndata: ${JSON.stringify({ type: 'content_delta', content: fallback })}\n\ndata: ${JSON.stringify({ type: 'message_end', message_id: messageId })}\n\ndata: [DONE]\n\n`;
+    res.status(200).send(body);
   }
-
-  res.write('data: [DONE]\n\n');
-  res.end();
 });
 
 // ==========================================
