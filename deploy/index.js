@@ -153,12 +153,80 @@ app.post('/api/agent/chat', async (req, res) => {
     return res.status(400).json({ error: 'message is required' });
   }
 
-  // Set up SSE
+  const messageId = uuidv4();
+  const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+  // In Lambda: API Gateway doesn't support SSE properly
+  // Return a single JSON response with the full content
+  if (isLambda) {
+    try {
+      let fullContent = '';
+
+      // Try Bedrock first
+      try {
+        const messages = [];
+        if (history && Array.isArray(history)) {
+          for (const h of history.slice(-10)) {
+            messages.push({ role: h.role, content: h.content });
+          }
+        }
+        messages.push({ role: 'user', content: message });
+
+        const bedrockMessages = messages.map(m => ({
+          role: m.role === 'assistant' ? 'assistant' : 'user',
+          content: [{ text: m.content }],
+        }));
+
+        const command = new ConverseStreamCommand({
+          modelId: AI_MODEL,
+          system: [{ text: SYSTEM_PROMPT }],
+          messages: bedrockMessages,
+          inferenceConfig: { maxTokens: 2048, temperature: 0.3 },
+        });
+
+        const bedrockResponse = await bedrockClient.send(command);
+        for await (const event of bedrockResponse.stream) {
+          if (event.contentBlockDelta?.delta?.text) {
+            fullContent += event.contentBlockDelta.delta.text;
+          }
+        }
+      } catch (bedrockErr) {
+        console.error('[Bedrock Error]', bedrockErr.message);
+        // Fallback to templates
+        fullContent = generateResponse(message);
+      }
+
+      // Return as SSE-formatted response (what frontend expects)
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      const events = [
+        `data: ${JSON.stringify({ type: 'message_start', message_id: messageId })}\n\n`,
+        `data: ${JSON.stringify({ type: 'content_delta', content: fullContent })}\n\n`,
+        `data: ${JSON.stringify({ type: 'message_end', message_id: messageId, usage: { total_tokens: 0, model: AI_MODEL } })}\n\n`,
+        `data: [DONE]\n\n`,
+      ].join('');
+      res.send(events);
+      return;
+    } catch (err) {
+      console.error('[Lambda Chat Error]', err.message);
+      const fallback = generateResponse(message);
+      res.setHeader('Content-Type', 'text/event-stream');
+      const events = [
+        `data: ${JSON.stringify({ type: 'message_start', message_id: messageId })}\n\n`,
+        `data: ${JSON.stringify({ type: 'content_delta', content: fallback })}\n\n`,
+        `data: ${JSON.stringify({ type: 'message_end', message_id: messageId })}\n\n`,
+        `data: [DONE]\n\n`,
+      ].join('');
+      res.send(events);
+      return;
+    }
+  }
+
+  // Non-Lambda (local dev): Use real SSE streaming
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
-  const messageId = uuidv4();
   res.write(`data: ${JSON.stringify({ type: 'message_start', message_id: messageId })}\n\n`);
 
   try {
