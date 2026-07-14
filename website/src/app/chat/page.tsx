@@ -35,7 +35,6 @@ export default function ChatPage() {
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [showRepoModal, setShowRepoModal] = useState(false);
   const [connectedRepo, setConnectedRepo] = useState('');
-  const [conversation_id] = useState('chat-' + Date.now());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,7 +68,6 @@ export default function ChatPage() {
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: msgText, attachments: attachedFiles.length > 0 ? [...attachedFiles] : undefined };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
-    const currentFiles = [...attachedFiles];
     setAttachedFiles([]);
     setLoading(true);
     setStreamingContent('');
@@ -77,43 +75,25 @@ export default function ChatPage() {
     // Auto-resize textarea back
     if (inputRef.current) inputRef.current.style.height = 'auto';
 
-    // Build the full message including file content
-    let fullMessage = msgText;
-    if (currentFiles.length > 0) {
-      fullMessage += `\n\n[Attached files: ${currentFiles.map(f => f.name).join(', ')}]`;
-      for (const f of currentFiles) {
-        if (f.content) {
-          fullMessage += `\n\n--- File: ${f.name} ---\n${f.content.slice(0, 8000)}`;
-        }
-      }
-    }
-
     try {
       const res = await fetch(`${API_URL}/api/agent/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: fullMessage,
-          conversation_id: conversation_id || 'chat-1',
-          history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
+          message: msgText + (userMsg.attachments?.length ? `\n\n[Attached files: ${userMsg.attachments.map(f => f.name).join(', ')}]${userMsg.attachments.filter(f => f.content).map(f => `\n\n--- File: ${f.name} ---\n${f.content?.slice(0, 5000)}`).join('')}` : ''),
+          conversation_id: 'chat-1',
+          history: messages.map(m => ({ role: m.role, content: m.content })),
         }),
       });
 
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
-      }
-
       const data = await res.json();
-      const content = data.content || 'No response received.';
+      const fullContent = data.content || 'No response received. Please try again.';
 
-      setMessages(prev => [...prev, { 
-        id: (Date.now() + 1).toString(), 
-        role: 'assistant', 
-        content 
-      }]);
-    } catch (err: any) {
-      console.error('Chat error:', err);
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `Connection error: ${err.message || 'Unable to reach the server'}. Please try again.` }]);
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: fullContent }]);
+      setStreamingContent('');
+    } catch {
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: 'Sorry, something went wrong. Please try again.' }]);
+      setStreamingContent('');
     }
 
     setLoading(false);
@@ -132,17 +112,12 @@ export default function ChatPage() {
 
     Array.from(files).forEach(file => {
       const reader = new FileReader();
-      
-      // Determine if file is text-readable
-      const textExtensions = ['.csv', '.json', '.yaml', '.yml', '.sql', '.py', '.txt', '.md', '.sas', '.xml', '.dtsx'];
-      const isTextFile = textExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
-
       reader.onload = () => {
         const newFile: AttachedFile = {
           name: file.name,
-          type: fileType === 'image' ? 'image' : 'file',
+          type: fileType,
           size: file.size,
-          content: isTextFile ? (reader.result as string) : `[Binary file: ${file.name}, ${(file.size / 1024).toFixed(1)}KB]`,
+          content: fileType === 'file' ? reader.result as string : undefined,
           preview: fileType === 'image' ? reader.result as string : undefined,
         };
         setAttachedFiles(prev => [...prev, newFile]);
@@ -150,17 +125,8 @@ export default function ChatPage() {
 
       if (fileType === 'image') {
         reader.readAsDataURL(file);
-      } else if (isTextFile) {
-        reader.readAsText(file);
       } else {
-        // For binary files (PDF, DOC, etc.), just record the name
-        const newFile: AttachedFile = {
-          name: file.name,
-          type: 'file',
-          size: file.size,
-          content: `[Uploaded file: ${file.name}, ${(file.size / 1024).toFixed(1)}KB - Please describe the contents or paste the text]`,
-        };
-        setAttachedFiles(prev => [...prev, newFile]);
+        reader.readAsText(file);
       }
     });
 
@@ -226,7 +192,6 @@ export default function ChatPage() {
           </button>
           <span className="text-sm text-gray-400">EADD Agent</span>
           <span className="ml-2 text-xs text-green-400 bg-green-400/10 px-2 py-0.5 rounded-full">Nova Lite</span>
-          <span className="ml-auto text-[10px] text-gray-600">v2.1</span>
         </header>
 
         {/* Messages Area */}
