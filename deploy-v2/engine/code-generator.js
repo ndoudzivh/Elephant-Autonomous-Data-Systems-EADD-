@@ -36,6 +36,7 @@ const TEMPLATES = {
   sql_transform: generateSQLTransform,
   dbt_model: generateDBTModel,
   python_extract: generatePythonExtract,
+  airflow_dag: generateAirflowDAG,
 };
 
 function generatePySparkBatch(params) {
@@ -603,9 +604,110 @@ function generatePipeline(request) {
   return generator(params);
 }
 
+function generateAirflowDAG(params) {
+  const {
+    pipeline_name,
+    source_path,
+    target_path,
+    source_table = 'source_table',
+    source_database = 'source_db',
+  } = params;
+
+  const code = `"""
+Pipeline: ${pipeline_name}
+Engine: Airflow + AWS (S3/Glue)
+Generated: ${new Date().toISOString()}
+"""
+
+from datetime import datetime
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from airflow.operators.empty import EmptyOperator
+from airflow.providers.amazon.aws.transfers.sql_to_s3 import SqlToS3Operator
+from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
+from airflow.providers.amazon.aws.operators.athena import AthenaOperator
+import logging
+
+logger = logging.getLogger("${pipeline_name}")
+
+# ─── DAG Definition ──────────────────────────────────────────
+with DAG(
+    dag_id="${pipeline_name}",
+    start_date=datetime(2024, 1, 1),
+    schedule_interval="@daily",
+    catchup=False,
+    max_active_runs=1,
+    tags=["eadd", "medallion", "postgres-to-s3"],
+) as dag:
+
+    start = EmptyOperator(task_id="start")
+
+    # ─── BRONZE: Extract from PostgreSQL → S3 ────────────────
+    extract_to_bronze = SqlToS3Operator(
+        task_id="extract_to_bronze",
+        query="""
+            SELECT * FROM ${source_table}
+            WHERE updated_at > '{{ ds }}'
+        """,
+        s3_bucket="${target_path.split('/')[2] || 'eadd-data-lake'}",
+        s3_key="bronze/${pipeline_name}/{{ ds }}/data.parquet",
+        file_format="parquet",
+        sql_conn_id="source_postgres",
+        replace=True,
+    )
+
+    # ─── SILVER: Clean & Transform via Glue ──────────────────
+    clean_to_silver = GlueJobOperator(
+        task_id="clean_to_silver",
+        job_name="silver_${pipeline_name}",
+        script_location="s3://eadd-scripts/silver/${pipeline_name}.py",
+        region_name="us-east-1",
+        num_of_dpus=2,
+        script_args={
+            "--source_path": "s3://eadd-data-lake/bronze/${pipeline_name}/{{ ds }}/",
+            "--target_path": "s3://eadd-data-lake/silver/${pipeline_name}/",
+        },
+    )
+
+    # ─── GOLD: Aggregate via Glue ────────────────────────────
+    aggregate_to_gold = GlueJobOperator(
+        task_id="aggregate_to_gold",
+        job_name="gold_${pipeline_name}",
+        script_location="s3://eadd-scripts/gold/${pipeline_name}.py",
+        region_name="us-east-1",
+        num_of_dpus=2,
+        script_args={
+            "--source_path": "s3://eadd-data-lake/silver/${pipeline_name}/",
+            "--target_path": "s3://eadd-data-lake/gold/${pipeline_name}/",
+        },
+    )
+
+    end = EmptyOperator(task_id="end")
+
+    # ─── Task Dependencies ───────────────────────────────────
+    start >> extract_to_bronze >> clean_to_silver >> aggregate_to_gold >> end
+`;
+
+  return {
+    pipeline_name,
+    code,
+    inputs: [`postgres://${source_database}/${source_table}`],
+    outputs: [`s3://eadd-data-lake/gold/${pipeline_name}/`],
+    engine: 'airflow',
+    validated: false,
+    metadata: {
+      dag_id: pipeline_name,
+      schedule: '@daily',
+      layers: ['bronze', 'silver', 'gold'],
+      generated_at: new Date().toISOString(),
+    },
+  };
+}
+
 function resolveTemplate(engine, type) {
   if (engine === 'pyspark' && type === 'streaming') return 'pyspark_streaming';
   if (engine === 'pyspark') return 'pyspark_batch';
+  if (engine === 'airflow') return 'airflow_dag';
   if (engine === 'glue') return 'glue_etl';
   if (engine === 'sql') return 'sql_transform';
   if (engine === 'dbt') return 'dbt_model';

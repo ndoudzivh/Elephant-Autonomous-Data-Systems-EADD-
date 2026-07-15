@@ -14,9 +14,11 @@
 'use strict';
 
 const ALLOWED_BUCKETS = [
+  'eadd-*',
   'eadd-*-data-lake',
   'eadd-*-scripts',
   'eadd-*-config',
+  'data-lake*',
 ];
 
 
