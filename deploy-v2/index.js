@@ -74,9 +74,33 @@ exports.handler = async (event) => {
     try {
       const engine = require('./engine');
       const { validatePipelineCode } = require('./validation');
-      const result = await engine.orchestrate(body);
+      const { routeToSkill } = require('./skills/router');
 
-      // Run validation gate on generated code (Req 2)
+      // Req 1: Check for verified skill before generating
+      const skillCheck = routeToSkill(body.description || '', body.engine);
+      if (!skillCheck.allowed) {
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            success: false,
+            error: skillCheck.message,
+            stackId: skillCheck.stackId,
+            availableSkills: ['airflow-aws', 'dbt-snowflake', 'adf-azure'],
+          }),
+        };
+      }
+
+      // Pass skill context to orchestrator
+      if (skillCheck.skill) {
+        body._skillContext = skillCheck.skill;
+        body._stackId = skillCheck.stackId;
+      }
+
+      const result = await engine.orchestrate(body);
+      result.skill = { stackId: skillCheck.stackId, message: skillCheck.message };
+
+      // Req 2: Run validation gate on generated code
       if (result.success && result.pipeline && result.pipeline.code) {
         const validation = validatePipelineCode(result.pipeline.code, {
           engine: result.pipeline.engine || 'python',
@@ -167,6 +191,16 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ log: engine.getAuditLog(50) }) };
     } catch (err) {
       return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
+  // GET /api/skills — List available verified skills
+  if (path.includes('/skills')) {
+    try {
+      const { listAvailableSkills } = require('./skills/router');
+      return { statusCode: 200, headers, body: JSON.stringify({ skills: listAvailableSkills(), message: 'Only these stacks have verified patterns. Others will use generic generation.' }) };
+    } catch (err) {
+      return { statusCode: 200, headers, body: JSON.stringify({ skills: ['airflow-aws', 'dbt-snowflake', 'adf-azure'] }) };
     }
   }
 
