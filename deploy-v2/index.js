@@ -209,6 +209,111 @@ exports.handler = async (event) => {
     }
   }
 
+  // POST /api/deliver — Full delivery: compile + scaffold + CI/CD + IaC + checklist
+  if (path.includes('/deliver') && method === 'POST') {
+    try {
+      const { compilePipeline } = require('./compilers');
+      const { generateScaffold } = require('./delivery/repo-scaffold');
+      const { generateGitHubActionsCI } = require('./delivery/cicd-generator');
+      const { generateTerraform } = require('./delivery/iac-generator');
+      const { assessProductionReadiness } = require('./delivery/prod-checklist');
+      const { validatePipelineCode } = require('./validation');
+
+      // Step 1: Compile
+      const compiled = compilePipeline(body);
+      if (!compiled.success) {
+        return { statusCode: 200, headers, body: JSON.stringify(compiled) };
+      }
+
+      // Step 2: Validate
+      let validationPassed = false;
+      if (compiled.output && compiled.output.code) {
+        const v = validatePipelineCode(compiled.output.code, {
+          engine: compiled.output.engine,
+          targetCloud: compiled.ir.target_platform,
+          pipelineName: compiled.ir.name,
+        });
+        validationPassed = v.passed;
+        compiled.validation = { passed: v.passed, checks: v.checks };
+      }
+
+      // Step 3: Scaffold
+      const scaffold = generateScaffold(compiled, compiled.ir);
+
+      // Step 4: CI/CD
+      const ciYaml = generateGitHubActionsCI(compiled.ir, compiled.ir.target_platform);
+      const ciFile = scaffold.files.find(f => f.path.includes('ci.yml'));
+      if (ciFile) ciFile.content = ciYaml;
+
+      // Step 5: IaC
+      const terraform = generateTerraform(compiled.ir);
+      const tfFile = scaffold.files.find(f => f.path.includes('main.tf'));
+      if (tfFile) tfFile.content = terraform;
+
+      // Step 6: Production checklist
+      const prodCheck = assessProductionReadiness({
+        validationPassed,
+        ciConfigured: true,
+        iacApplied: false,
+        secretsConfigured: false,
+        realRunSuccess: false,
+        monitoringConfigured: false,
+      });
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          pipeline: compiled.output,
+          ir: compiled.ir,
+          scaffold,
+          ci_cd: { generated: true, path: '.github/workflows/ci.yml' },
+          infrastructure: { generated: true, path: 'infra/main.tf', note: 'Run terraform plan to review. Never auto-apply.' },
+          production_readiness: prodCheck,
+          next_steps: [
+            'Review generated files',
+            'Push to GitHub (requires your confirmation)',
+            'Configure secrets in GitHub Actions',
+            'Run terraform plan && terraform apply',
+            'Trigger first real pipeline run',
+          ],
+        }),
+      };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
+  // POST /api/push — Push to GitHub (requires explicit confirmation)
+  if (path.includes('/push') && method === 'POST') {
+    const { confirm, repo, branch } = body;
+    if (!confirm) {
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          action: 'push_pending',
+          message: 'This will push generated files to your repository. Please confirm.',
+          repo: repo || 'not specified',
+          branch: branch || 'feature/eadd-pipeline',
+          note: 'Will open a Pull Request — never pushes directly to main.',
+          confirm_by: 'Resend this request with "confirm": true',
+        }),
+      };
+    }
+    // User confirmed — in production, this calls GitHub API
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        action: 'push_confirmed',
+        message: `Files would be pushed to ${repo || 'your-repo'}:${branch || 'feature/eadd-pipeline'}. (Actual push requires GitHub token integration.)`,
+        note: 'A Pull Request will be opened for human review.',
+      }),
+    };
+  }
+
   // POST /api/engine/introspect — Schema discovery (Req 3)
   if (path.includes('/engine/introspect') && method === 'POST') {
     try {
