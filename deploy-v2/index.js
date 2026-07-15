@@ -167,6 +167,48 @@ exports.handler = async (event) => {
     }
   }
 
+  // POST /api/compile — IR-based cross-platform compilation (v3)
+  if (path.includes('/compile') && method === 'POST') {
+    try {
+      const { compilePipeline, compileMultiPlatform } = require('./compilers');
+      const { validatePipelineCode } = require('./validation');
+
+      // Multi-platform mode
+      if (body.multi_platform && body.ir) {
+        const results = compileMultiPlatform(body.ir, body.platforms);
+        return { statusCode: 200, headers, body: JSON.stringify({ success: true, results }) };
+      }
+
+      // Single platform compilation
+      const result = compilePipeline(body);
+
+      // Run validation gate on compiled output
+      if (result.success && result.output && result.output.code) {
+        const validation = validatePipelineCode(result.output.code, {
+          engine: result.output.engine,
+          targetCloud: result.ir.target_platform,
+          pipelineName: result.ir.name,
+        });
+        result.validation = { passed: validation.passed, checks: validation.checks };
+      }
+
+      return { statusCode: 200, headers, body: JSON.stringify(result) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
+  // POST /api/ir/parse — Parse natural language to IR
+  if (path.includes('/ir/parse') && method === 'POST') {
+    try {
+      const { parseToIR } = require('./compilers/ir-schema');
+      const result = parseToIR(body.description || '', body);
+      return { statusCode: 200, headers, body: JSON.stringify(result) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
   // POST /api/engine/introspect — Schema discovery (Req 3)
   if (path.includes('/engine/introspect') && method === 'POST') {
     try {
