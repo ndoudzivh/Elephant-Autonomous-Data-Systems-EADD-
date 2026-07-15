@@ -63,9 +63,11 @@ export default function ChatPage() {
 
   const sendMessage = async (text?: string) => {
     const msgText = text || input.trim();
-    if (!msgText || loading) return;
+    if ((!msgText && attachedFiles.length === 0) || loading) return;
 
-    const userMsg: Message = { id: Date.now().toString(), role: 'user', content: msgText, attachments: attachedFiles.length > 0 ? [...attachedFiles] : undefined };
+    const displayText = msgText || `[Uploaded: ${attachedFiles.map(f => f.name).join(', ')}]`;
+
+    const userMsg: Message = { id: Date.now().toString(), role: 'user', content: displayText, attachments: attachedFiles.length > 0 ? [...attachedFiles] : undefined };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setAttachedFiles([]);
@@ -206,6 +208,18 @@ export default function ChatPage() {
 
                 {/* Input Area */}
                 <div className="relative mb-6">
+                  {/* Attached files visible above input */}
+                  {attachedFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-3 justify-center">
+                      {attachedFiles.map((file, i) => (
+                        <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/10 border border-blue-500/20 rounded-lg text-xs">
+                          <span>{file.type === 'image' ? '🖼️' : file.type === 'repo' ? '🔗' : '📄'}</span>
+                          <span className="text-gray-300 max-w-[150px] truncate">{file.name}</span>
+                          <button onClick={() => setAttachedFiles(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-500 hover:text-red-400">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <textarea
                     ref={inputRef}
                     value={input}
@@ -217,7 +231,7 @@ export default function ChatPage() {
                   />
                   <button
                     onClick={() => sendMessage()}
-                    disabled={!input.trim() || loading}
+                    disabled={(!input.trim() && attachedFiles.length === 0) || loading}
                     className="absolute right-3 bottom-3 p-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 rounded-lg transition"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7"/></svg>
