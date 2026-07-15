@@ -75,6 +75,8 @@ exports.handler = async (event) => {
       const engine = require('./engine');
       const { validatePipelineCode } = require('./validation');
       const { routeToSkill } = require('./skills/router');
+      const { assessConfidence, wrapWithConfidence } = require('./validation/confidence-scope');
+      const { checkForLooping } = require('./validation/loop-prevention');
 
       // Req 1: Check for verified skill before generating
       const skillCheck = routeToSkill(body.description || '', body.engine);
@@ -102,6 +104,18 @@ exports.handler = async (event) => {
 
       // Req 2: Run validation gate on generated code
       if (result.success && result.pipeline && result.pipeline.code) {
+        // Req 3: Check for looping/degeneracy before full validation
+        const loopCheck = checkForLooping(result.pipeline.code, {
+          platform: body.target_cloud || 'aws',
+          prompt: body.description,
+        });
+        if (loopCheck.abort) {
+          result.success = false;
+          result.error = `Generation aborted: ${loopCheck.reason}`;
+          result.aborted = true;
+          return { statusCode: 200, headers, body: JSON.stringify(result) };
+        }
+
         const validation = validatePipelineCode(result.pipeline.code, {
           engine: result.pipeline.engine || 'python',
           targetCloud: body.target_cloud || 'aws',
@@ -121,6 +135,18 @@ exports.handler = async (event) => {
 
         if (!validation.passed) {
           result.validation.failureMessage = validation.failureMessage;
+        }
+
+        // Req 5: Assess confidence and wrap response
+        const confidence = assessConfidence({
+          skillUsed: !!skillCheck.stackId,
+          stackId: skillCheck.stackId,
+          validationPassed: validation.passed,
+          validationAttempts: validation.attempts,
+        });
+        result.confidence = confidence;
+        if (confidence.level !== 'verified' && confidence.description) {
+          result.disclaimer = confidence.description;
         }
       }
 

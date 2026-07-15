@@ -23,6 +23,8 @@ const STACK_PATTERNS = {
   'airflow-aws': ['airflow', 'aws', 's3', 'glue', 'athena', 'mwaa'],
   'dbt-snowflake': ['dbt', 'snowflake'],
   'adf-azure': ['azure', 'adf', 'data factory', 'adls', 'synapse'],
+  'beam-gcp': ['beam', 'gcp', 'bigquery', 'dataflow', 'google cloud'],
+  'databricks-adls': ['databricks', 'azure data lake', 'adls', 'delta lake'],
 };
 
 /**
@@ -38,6 +40,8 @@ function detectStack(description, engine) {
   if (engine === 'airflow' || engine === 'glue') return 'airflow-aws';
   if (engine === 'dbt') return 'dbt-snowflake';
   if (engine === 'adf') return 'adf-azure';
+  if (engine === 'beam' || engine === 'dataflow') return 'beam-gcp';
+  if (engine === 'databricks') return 'databricks-adls';
 
   // Keyword detection
   for (const [stackId, keywords] of Object.entries(STACK_PATTERNS)) {
@@ -49,6 +53,8 @@ function detectStack(description, engine) {
   if (lower.includes('airflow')) return 'airflow-aws';
   if (lower.includes('dbt')) return 'dbt-snowflake';
   if (lower.includes('data factory') || lower.includes('adf')) return 'adf-azure';
+  if (lower.includes('beam') || lower.includes('dataflow')) return 'beam-gcp';
+  if (lower.includes('databricks')) return 'databricks-adls';
 
   return null;
 }
