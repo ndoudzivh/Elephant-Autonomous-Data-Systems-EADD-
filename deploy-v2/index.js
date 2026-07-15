@@ -141,6 +141,17 @@ exports.handler = async (event) => {
     }
   }
 
+  // POST /api/engine/introspect — Schema discovery (Req 3)
+  if (path.includes('/engine/introspect') && method === 'POST') {
+    try {
+      const { introspectSource } = require('./introspection');
+      const result = introspectSource(body);
+      return { statusCode: 200, headers, body: JSON.stringify(result) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
   // POST /api/engine/fix — Auto-fix loop
   if (path.includes('/engine/fix') && method === 'POST') {
     try {
@@ -195,12 +206,40 @@ exports.handler = async (event) => {
   }
 
   // GET /api/skills — List available verified skills
-  if (path.includes('/skills')) {
+  if (path.includes('/skills') && !path.includes('/engine')) {
     try {
       const { listAvailableSkills } = require('./skills/router');
-      return { statusCode: 200, headers, body: JSON.stringify({ skills: listAvailableSkills(), message: 'Only these stacks have verified patterns. Others will use generic generation.' }) };
+      const { getPendingDefects, getCorrectionHistory } = require('./skills/self-correction');
+      return { statusCode: 200, headers, body: JSON.stringify({
+        skills: listAvailableSkills(),
+        pending_defects: getPendingDefects().length,
+        correction_history: getCorrectionHistory(10).length,
+        message: 'Only these stacks have verified patterns.',
+      }) };
     } catch (err) {
       return { statusCode: 200, headers, body: JSON.stringify({ skills: ['airflow-aws', 'dbt-snowflake', 'adf-azure'] }) };
+    }
+  }
+
+  // POST /api/skills/report-defect — Report a skill defect (Req 4)
+  if (path.includes('/skills/report') && method === 'POST') {
+    try {
+      const { reportDefect } = require('./skills/self-correction');
+      const result = reportDefect(body);
+      return { statusCode: 200, headers, body: JSON.stringify(result) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
+  // POST /api/skills/approve — Approve a correction (Req 4)
+  if (path.includes('/skills/approve') && method === 'POST') {
+    try {
+      const { approveCorrection } = require('./skills/self-correction');
+      const result = approveCorrection(body.defect_id, body.corrected_pattern);
+      return { statusCode: 200, headers, body: JSON.stringify(result) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
     }
   }
 
