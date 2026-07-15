@@ -22,6 +22,8 @@ const { validateBoto3Methods } = require('./sdk-verifier');
 const { validateAirflowDAG } = require('./airflow-validator');
 const { validateImports } = require('./import-checker');
 const { logValidationFailure } = require('./failure-logger');
+const { checkRepetition } = require('./repetition-checker');
+const { checkPlatformImports } = require('./platform-import-checker');
 
 /**
  * @typedef {Object} ValidationResult
@@ -88,25 +90,38 @@ function validatePipelineCode(code, options = {}) {
 
 /**
  * Run all validation checks on the code.
+ * Order: repetition (cheapest) → syntax → platform imports → SDK methods → Airflow
  */
 function runAllChecks(code, engine, targetCloud) {
   const checks = [];
 
-  // 1. Syntax check
+  // Gate 1: Repetition/degeneracy (CHEAPEST — run first)
+  const repetition = checkRepetition(code);
+  checks.push({ check: 'repetition', passed: repetition.valid, errors: repetition.errors });
+  if (!repetition.valid) {
+    // Don't bother with other checks if output is degenerate
+    return { passed: false, checks };
+  }
+
+  // Gate 2: Syntax check
   const syntax = validateSyntax(code);
   checks.push({ check: 'syntax', passed: syntax.valid, errors: syntax.errors });
 
-  // 2. Import verification
+  // Gate 3: Platform-consistency import check
+  const platformImports = checkPlatformImports(code, targetCloud);
+  checks.push({ check: 'platform_imports', passed: platformImports.valid, errors: platformImports.errors });
+
+  // Gate 4: Import verification (deprecated paths)
   const imports = validateImports(code, engine);
   checks.push({ check: 'imports', passed: imports.valid, errors: imports.errors });
 
-  // 3. boto3/SDK method verification (AWS only)
+  // Gate 5: boto3/SDK method verification (AWS only)
   if (targetCloud === 'aws') {
     const sdk = validateBoto3Methods(code);
     checks.push({ check: 'sdk_methods', passed: sdk.valid, errors: sdk.errors });
   }
 
-  // 4. Airflow DAG validation (if Airflow engine)
+  // Gate 6: Airflow DAG validation (if Airflow engine)
   if (engine === 'airflow') {
     const dag = validateAirflowDAG(code);
     checks.push({ check: 'airflow_dag', passed: dag.valid, errors: dag.errors });
