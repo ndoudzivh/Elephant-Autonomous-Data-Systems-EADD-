@@ -73,7 +73,33 @@ exports.handler = async (event) => {
   if (path.includes('/engine/generate') && method === 'POST') {
     try {
       const engine = require('./engine');
+      const { validatePipelineCode } = require('./validation');
       const result = await engine.orchestrate(body);
+
+      // Run validation gate on generated code (Req 2)
+      if (result.success && result.pipeline && result.pipeline.code) {
+        const validation = validatePipelineCode(result.pipeline.code, {
+          engine: result.pipeline.engine || 'python',
+          targetCloud: body.target_cloud || 'aws',
+          pipelineName: result.pipeline.pipeline_name,
+        });
+
+        result.validation = {
+          passed: validation.passed,
+          checks: validation.checks,
+          attempts: validation.attempts,
+        };
+
+        if (validation.correctedCode) {
+          result.pipeline.code = validation.correctedCode;
+          result.pipeline.auto_corrected = true;
+        }
+
+        if (!validation.passed) {
+          result.validation.failureMessage = validation.failureMessage;
+        }
+      }
+
       return { statusCode: 200, headers, body: JSON.stringify(result) };
     } catch (err) {
       return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
