@@ -46,12 +46,13 @@ function validateSyntax(code) {
     const trimmed = lines[i].trim();
     if (/^(def|class|if|elif|else|for|while|try|except|finally|with)\b/.test(trimmed)) {
       // Check if line ends with colon (allowing for multi-line)
-      if (!trimmed.endsWith(':') && !trimmed.endsWith(':\\') && !trimmed.endsWith(',')) {
+      if (!trimmed.endsWith(':') && !trimmed.endsWith(':\\') && !trimmed.endsWith(',') && !trimmed.endsWith('(') && !trimmed.endsWith(')')) {
         // Could be a multi-line statement — check next lines
         let found = false;
-        for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+        for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
           if (lines[j].trim().endsWith(':')) { found = true; break; }
-          if (lines[j].trim() && !lines[j].trim().endsWith(',') && !lines[j].trim().endsWith('\\')) break;
+          if (lines[j].trim().endsWith(') as') || lines[j].trim().includes(') as ')) { found = true; break; }
+          if (lines[j].trim() && !lines[j].trim().endsWith(',') && !lines[j].trim().endsWith('\\') && !lines[j].trim().endsWith('(') && !lines[j].trim().endsWith(')') && !lines[j].trim().startsWith(')') && !lines[j].trim().startsWith('#')) break;
         }
         if (!found && !trimmed.includes(':')) {
           errors.push(`Line ${i + 1}: '${trimmed.split(' ')[0]}' statement may be missing colon`);
