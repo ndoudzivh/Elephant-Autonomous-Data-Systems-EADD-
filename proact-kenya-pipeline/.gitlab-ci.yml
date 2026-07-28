@@ -1,0 +1,671 @@
+# =============================================================================
+# ProACT Kenya Pipeline - GitLab CI/CD
+# =============================================================================
+# Pipeline Flow (per diagram):
+#   Import/Register (one-time, outside pipeline) triggers GitLab pipeline
+#   GitLab pipeline: Preflight → Publish → Verify → Approve → Monitor
+#
+# Three model destinations:
+#   - Simulation      (KE-model-sim)
+#   - Scenario Planning (KE-model-scenpl)
+#   - Operational     (KE-model-ops)
+#
+# Three environments:
+#   - dev   (development / sandbox)
+#   - uat   (user acceptance testing)
+#   - prod  (production)
+# =============================================================================
+
+stages:
+  - preflight
+  - publish
+  - verify
+  - approve
+  - monitor
+
+# ---------------------------------------------------------------------------
+# Global variables — override per environment via GitLab CI/CD settings
+# ---------------------------------------------------------------------------
+variables:
+  SAS_VIYA_URL: "${SAS_VIYA_URL}"
+  DENODO_DSN: "${DENODO_DSN}"
+  DENODO_USER: "${DENODO_USER}"
+  DENODO_PASSWORD: "${DENODO_PASSWORD}"
+  SAS_USER: "${SAS_USER}"
+  SAS_PASSWORD: "${SAS_PASSWORD}"
+  # Model naming convention
+  MODEL_PREFIX: "KE"
+  # CAS library suffixes per environment
+  CASLIB_SUFFIX: "${CASLIB_SUFFIX}"
+
+# ---------------------------------------------------------------------------
+# Reusable job templates (YAML anchors)
+# ---------------------------------------------------------------------------
+.sas_runner:
+  tags:
+    - proact
+  before_script:
+    - echo "Environment = ${CI_ENVIRONMENT_NAME}"
+    - echo "Model Destination = ${MODEL_DESTINATION}"
+    - echo "SAS Viya = ${SAS_VIYA_URL}"
+
+.only_dev:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: always
+
+.only_uat:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release" || $CI_COMMIT_BRANCH =~ /^release\//'
+      when: always
+
+.only_prod:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+
+# =============================================================================
+# DEV ENVIRONMENT
+# =============================================================================
+
+# --- SIMULATION (DEV) ---
+preflight:simulation:dev:
+  stage: preflight
+  extends: .sas_runner
+  environment:
+    name: dev
+  variables:
+    MODEL_DESTINATION: "simulation"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_simulation"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_Dev"
+  script:
+    - echo "Running preflight checks for Simulation (Dev)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/preflight/preflight_check.sas" -Env "dev" -Destination "simulation"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: always
+
+publish:simulation:dev:
+  stage: publish
+  extends: .sas_runner
+  environment:
+    name: dev
+  variables:
+    MODEL_DESTINATION: "simulation"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_simulation"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_Dev"
+  script:
+    - echo "Publishing model to Simulation CAS table (Dev)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/publish/publish_simulation.sas" -Env "dev" -Destination "simulation"
+  needs: ["preflight:simulation:dev"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: always
+
+verify:simulation:dev:
+  stage: verify
+  extends: .sas_runner
+  environment:
+    name: dev
+  variables:
+    MODEL_DESTINATION: "simulation"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_simulation"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_Dev"
+  script:
+    - echo "Running scoring verification for Simulation (Dev)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/verify/verify_scoring.sas" -Env "dev" -Destination "simulation"
+  needs: ["publish:simulation:dev"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: always
+
+approve:simulation:dev:
+  stage: approve
+  extends: .sas_runner
+  environment:
+    name: dev
+  variables:
+    MODEL_DESTINATION: "simulation"
+  script:
+    - echo "Governance gate - Simulation (Dev) approved"
+  needs: ["verify:simulation:dev"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+  allow_failure: false
+
+# --- SCENARIO PLANNING (DEV) ---
+preflight:scenario:dev:
+  stage: preflight
+  extends: .sas_runner
+  environment:
+    name: dev
+  variables:
+    MODEL_DESTINATION: "scenario_planning"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_scenario"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_Dev"
+  script:
+    - echo "Running preflight checks for Scenario Planning (Dev)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/preflight/preflight_check.sas" -Env "dev" -Destination "scenario_planning"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: always
+
+publish:scenario:dev:
+  stage: publish
+  extends: .sas_runner
+  environment:
+    name: dev
+  variables:
+    MODEL_DESTINATION: "scenario_planning"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_scenario"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_Dev"
+  script:
+    - echo "Publishing model to Scenario Planning CAS table (Dev)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/publish/publish_scenario.sas" -Env "dev" -Destination "scenario_planning"
+  needs: ["preflight:scenario:dev"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: always
+
+verify:scenario:dev:
+  stage: verify
+  extends: .sas_runner
+  environment:
+    name: dev
+  variables:
+    MODEL_DESTINATION: "scenario_planning"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_scenario"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_Dev"
+  script:
+    - echo "Running scoring verification for Scenario Planning (Dev)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/verify/verify_scoring.sas" -Env "dev" -Destination "scenario_planning"
+  needs: ["publish:scenario:dev"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: always
+
+approve:scenario:dev:
+  stage: approve
+  extends: .sas_runner
+  environment:
+    name: dev
+  variables:
+    MODEL_DESTINATION: "scenario_planning"
+  script:
+    - echo "Governance gate - Scenario Planning (Dev) approved"
+  needs: ["verify:scenario:dev"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+  allow_failure: false
+
+# --- OPERATIONAL (DEV) ---
+preflight:operational:dev:
+  stage: preflight
+  extends: .sas_runner
+  environment:
+    name: dev
+  variables:
+    MODEL_DESTINATION: "operational"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_operational"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_Dev"
+  script:
+    - echo "Running preflight checks for Operational (Dev)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/preflight/preflight_check.sas" -Env "dev" -Destination "operational"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: always
+
+publish:operational:dev:
+  stage: publish
+  extends: .sas_runner
+  environment:
+    name: dev
+  variables:
+    MODEL_DESTINATION: "operational"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_operational"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_Dev"
+  script:
+    - echo "Publishing model to Operational CAS table (Dev)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/publish/publish_operational.sas" -Env "dev" -Destination "operational"
+  needs: ["preflight:operational:dev"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: always
+
+approve:operational:dev:
+  stage: approve
+  extends: .sas_runner
+  environment:
+    name: dev
+  variables:
+    MODEL_DESTINATION: "operational"
+  script:
+    - echo "Governance gate - Operational (Dev) approved"
+  needs: ["publish:operational:dev"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+  allow_failure: false
+
+monitor:operational:dev:
+  stage: monitor
+  extends: .sas_runner
+  environment:
+    name: dev
+  variables:
+    MODEL_DESTINATION: "operational"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_operational"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_Dev"
+  script:
+    - echo "Running monitoring scoring test for Operational (Dev)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/monitor/monitor_scoring.sas" -Env "dev" -Destination "operational"
+  needs: ["approve:operational:dev"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: always
+
+# =============================================================================
+# UAT ENVIRONMENT
+# =============================================================================
+
+# --- SIMULATION (UAT) ---
+preflight:simulation:uat:
+  stage: preflight
+  extends: .sas_runner
+  environment:
+    name: uat
+  variables:
+    MODEL_DESTINATION: "simulation"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_simulation"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_UAT"
+  script:
+    - echo "Running preflight checks for Simulation (UAT)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/preflight/preflight_check.sas" -Env "uat" -Destination "simulation"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release" || $CI_COMMIT_BRANCH =~ /^release\//'
+      when: always
+
+publish:simulation:uat:
+  stage: publish
+  extends: .sas_runner
+  environment:
+    name: uat
+  variables:
+    MODEL_DESTINATION: "simulation"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_simulation"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_UAT"
+  script:
+    - echo "Publishing model to Simulation CAS table (UAT)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/publish/publish_simulation.sas" -Env "uat" -Destination "simulation"
+  needs: ["preflight:simulation:uat"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release" || $CI_COMMIT_BRANCH =~ /^release\//'
+      when: always
+
+verify:simulation:uat:
+  stage: verify
+  extends: .sas_runner
+  environment:
+    name: uat
+  variables:
+    MODEL_DESTINATION: "simulation"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_simulation"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_UAT"
+  script:
+    - echo "Running scoring verification for Simulation (UAT)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/verify/verify_scoring.sas" -Env "uat" -Destination "simulation"
+  needs: ["publish:simulation:uat"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release" || $CI_COMMIT_BRANCH =~ /^release\//'
+      when: always
+
+approve:simulation:uat:
+  stage: approve
+  extends: .sas_runner
+  environment:
+    name: uat
+  variables:
+    MODEL_DESTINATION: "simulation"
+  script:
+    - echo "Governance gate - Simulation (UAT) approved"
+  needs: ["verify:simulation:uat"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release" || $CI_COMMIT_BRANCH =~ /^release\//'
+      when: manual
+  allow_failure: false
+
+# --- SCENARIO PLANNING (UAT) ---
+preflight:scenario:uat:
+  stage: preflight
+  extends: .sas_runner
+  environment:
+    name: uat
+  variables:
+    MODEL_DESTINATION: "scenario_planning"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_scenario"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_UAT"
+  script:
+    - echo "Running preflight checks for Scenario Planning (UAT)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/preflight/preflight_check.sas" -Env "uat" -Destination "scenario_planning"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release" || $CI_COMMIT_BRANCH =~ /^release\//'
+      when: always
+
+publish:scenario:uat:
+  stage: publish
+  extends: .sas_runner
+  environment:
+    name: uat
+  variables:
+    MODEL_DESTINATION: "scenario_planning"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_scenario"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_UAT"
+  script:
+    - echo "Publishing model to Scenario Planning CAS table (UAT)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/publish/publish_scenario.sas" -Env "uat" -Destination "scenario_planning"
+  needs: ["preflight:scenario:uat"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release" || $CI_COMMIT_BRANCH =~ /^release\//'
+      when: always
+
+verify:scenario:uat:
+  stage: verify
+  extends: .sas_runner
+  environment:
+    name: uat
+  variables:
+    MODEL_DESTINATION: "scenario_planning"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_scenario"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_UAT"
+  script:
+    - echo "Running scoring verification for Scenario Planning (UAT)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/verify/verify_scoring.sas" -Env "uat" -Destination "scenario_planning"
+  needs: ["publish:scenario:uat"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release" || $CI_COMMIT_BRANCH =~ /^release\//'
+      when: always
+
+approve:scenario:uat:
+  stage: approve
+  extends: .sas_runner
+  environment:
+    name: uat
+  variables:
+    MODEL_DESTINATION: "scenario_planning"
+  script:
+    - echo "Governance gate - Scenario Planning (UAT) approved"
+  needs: ["verify:scenario:uat"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release" || $CI_COMMIT_BRANCH =~ /^release\//'
+      when: manual
+  allow_failure: false
+
+# --- OPERATIONAL (UAT) ---
+preflight:operational:uat:
+  stage: preflight
+  extends: .sas_runner
+  environment:
+    name: uat
+  variables:
+    MODEL_DESTINATION: "operational"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_operational"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_UAT"
+  script:
+    - echo "Running preflight checks for Operational (UAT)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/preflight/preflight_check.sas" -Env "uat" -Destination "operational"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release" || $CI_COMMIT_BRANCH =~ /^release\//'
+      when: always
+
+publish:operational:uat:
+  stage: publish
+  extends: .sas_runner
+  environment:
+    name: uat
+  variables:
+    MODEL_DESTINATION: "operational"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_operational"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_UAT"
+  script:
+    - echo "Publishing model to Operational CAS table (UAT)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/publish/publish_operational.sas" -Env "uat" -Destination "operational"
+  needs: ["preflight:operational:uat"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release" || $CI_COMMIT_BRANCH =~ /^release\//'
+      when: always
+
+approve:operational:uat:
+  stage: approve
+  extends: .sas_runner
+  environment:
+    name: uat
+  variables:
+    MODEL_DESTINATION: "operational"
+  script:
+    - echo "Governance gate - Operational (UAT) approved"
+  needs: ["publish:operational:uat"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release" || $CI_COMMIT_BRANCH =~ /^release\//'
+      when: manual
+  allow_failure: false
+
+monitor:operational:uat:
+  stage: monitor
+  extends: .sas_runner
+  environment:
+    name: uat
+  variables:
+    MODEL_DESTINATION: "operational"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_operational"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya_UAT"
+  script:
+    - echo "Running monitoring scoring test for Operational (UAT)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/monitor/monitor_scoring.sas" -Env "uat" -Destination "operational"
+  needs: ["approve:operational:uat"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release" || $CI_COMMIT_BRANCH =~ /^release\//'
+      when: always
+
+# =============================================================================
+# PROD ENVIRONMENT
+# =============================================================================
+
+# --- SIMULATION (PROD) ---
+preflight:simulation:prod:
+  stage: preflight
+  extends: .sas_runner
+  environment:
+    name: prod
+  variables:
+    MODEL_DESTINATION: "simulation"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_simulation"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya"
+  script:
+    - echo "Running preflight checks for Simulation (Prod)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/preflight/preflight_check.sas" -Env "prod" -Destination "simulation"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+
+publish:simulation:prod:
+  stage: publish
+  extends: .sas_runner
+  environment:
+    name: prod
+  variables:
+    MODEL_DESTINATION: "simulation"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_simulation"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya"
+  script:
+    - echo "Publishing model to Simulation CAS table (Prod)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/publish/publish_simulation.sas" -Env "prod" -Destination "simulation"
+  needs: ["preflight:simulation:prod"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+
+verify:simulation:prod:
+  stage: verify
+  extends: .sas_runner
+  environment:
+    name: prod
+  variables:
+    MODEL_DESTINATION: "simulation"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_simulation"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya"
+  script:
+    - echo "Running scoring verification for Simulation (Prod)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/verify/verify_scoring.sas" -Env "prod" -Destination "simulation"
+  needs: ["publish:simulation:prod"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+
+approve:simulation:prod:
+  stage: approve
+  extends: .sas_runner
+  environment:
+    name: prod
+  variables:
+    MODEL_DESTINATION: "simulation"
+  script:
+    - echo "Governance gate - Simulation (Prod) approved"
+  needs: ["verify:simulation:prod"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  allow_failure: false
+
+# --- SCENARIO PLANNING (PROD) ---
+preflight:scenario:prod:
+  stage: preflight
+  extends: .sas_runner
+  environment:
+    name: prod
+  variables:
+    MODEL_DESTINATION: "scenario_planning"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_scenario"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya"
+  script:
+    - echo "Running preflight checks for Scenario Planning (Prod)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/preflight/preflight_check.sas" -Env "prod" -Destination "scenario_planning"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+
+publish:scenario:prod:
+  stage: publish
+  extends: .sas_runner
+  environment:
+    name: prod
+  variables:
+    MODEL_DESTINATION: "scenario_planning"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_scenario"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya"
+  script:
+    - echo "Publishing model to Scenario Planning CAS table (Prod)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/publish/publish_scenario.sas" -Env "prod" -Destination "scenario_planning"
+  needs: ["preflight:scenario:prod"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+
+verify:scenario:prod:
+  stage: verify
+  extends: .sas_runner
+  environment:
+    name: prod
+  variables:
+    MODEL_DESTINATION: "scenario_planning"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_scenario"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya"
+  script:
+    - echo "Running scoring verification for Scenario Planning (Prod)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/verify/verify_scoring.sas" -Env "prod" -Destination "scenario_planning"
+  needs: ["publish:scenario:prod"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+
+approve:scenario:prod:
+  stage: approve
+  extends: .sas_runner
+  environment:
+    name: prod
+  variables:
+    MODEL_DESTINATION: "scenario_planning"
+  script:
+    - echo "Governance gate - Scenario Planning (Prod) approved"
+  needs: ["verify:scenario:prod"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  allow_failure: false
+
+# --- OPERATIONAL (PROD) ---
+preflight:operational:prod:
+  stage: preflight
+  extends: .sas_runner
+  environment:
+    name: prod
+  variables:
+    MODEL_DESTINATION: "operational"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_operational"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya"
+  script:
+    - echo "Running preflight checks for Operational (Prod)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/preflight/preflight_check.sas" -Env "prod" -Destination "operational"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+
+publish:operational:prod:
+  stage: publish
+  extends: .sas_runner
+  environment:
+    name: prod
+  variables:
+    MODEL_DESTINATION: "operational"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_operational"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya"
+  script:
+    - echo "Publishing model to Operational CAS table (Prod)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/publish/publish_operational.sas" -Env "prod" -Destination "operational"
+  needs: ["preflight:operational:prod"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+
+approve:operational:prod:
+  stage: approve
+  extends: .sas_runner
+  environment:
+    name: prod
+  variables:
+    MODEL_DESTINATION: "operational"
+  script:
+    - echo "Governance gate - Operational (Prod) approved"
+  needs: ["publish:operational:prod"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  allow_failure: false
+
+monitor:operational:prod:
+  stage: monitor
+  extends: .sas_runner
+  environment:
+    name: prod
+  variables:
+    MODEL_DESTINATION: "operational"
+    CAS_TABLE_NAME: "${MODEL_PREFIX}_model_operational"
+    CASLIB_NAME: "CAS_AR_CSE_Kenya"
+  script:
+    - echo "Running monitoring scoring test for Operational (Prod)"
+    - powershell -File scripts/run_sas_program.ps1 -Program "sas/monitor/monitor_scoring.sas" -Env "prod" -Destination "operational"
+  needs: ["approve:operational:prod"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
